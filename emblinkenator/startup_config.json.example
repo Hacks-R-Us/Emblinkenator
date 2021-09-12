@@ -1,0 +1,47 @@
+{
+    "fixtures": [
+        {
+            "id": "fixture_1",
+            "num_leds": 100
+        }
+    ],
+    "animations": [
+        {
+            "shader_id": "colourfade",
+            "target_id": {
+                "Fixture": "fixture_1"
+            }
+        }
+    ],
+    "devices": [
+        {
+            "id": "device_1",
+            "config": {
+                "LEDDataOutput": {
+                    "MQTT": {
+                        "name": "Some Name",
+                        "host": "0.0.0.0",
+                        "port": 1883,
+                        "topic": "some/topic/name",
+                        "credentials": ["username", "password"]
+                    }
+                }
+            }
+        },
+        {
+            "id": "device_2",
+            "config": {
+                "LEDDataOutput": {
+                    "UDP": {
+                        "name": "Some Other Name (This device is not mapped to anything right now)",
+                        "host": "0.0.0.0",
+                        "port": 1883
+                    }
+                }
+            }
+        }
+    ],
+    "fixtures_to_device": {
+        "fixture_1": "device_1"
+    }
+}
