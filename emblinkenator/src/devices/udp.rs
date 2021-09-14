@@ -18,7 +18,7 @@ impl UDPSenderConfig {
         name: String,
         host: String,
         port: u16,
-        socket: UdpSocket
+        _socket: UdpSocket
     ) -> Self {
         UDPSenderConfig {
             name,

@@ -283,7 +283,7 @@ impl WorldContext {
         let installations = self.collection.installations.write();
         let groups = self.collection.groups.write();
 
-        for (fixture_id, fixture) in fixtures.iter() {
+        for (_fixture_id, fixture) in fixtures.iter() {
             led_positions.insert(
                 fixture.id().clone().unprotect(),
                 fixture.get_all_led_positions(),
@@ -295,7 +295,7 @@ impl WorldContext {
             );
         }
 
-        for (installation_id, installation) in installations.iter() {
+        for (_installation_id, installation) in installations.iter() {
             led_positions.insert(
                 installation.id().clone().unprotect(),
                 installation.get_all_led_positions(self),
@@ -310,7 +310,7 @@ impl WorldContext {
             );
         }
 
-        for (group_id, group) in groups.iter() {
+        for (_group_id, group) in groups.iter() {
             led_positions.insert(group.id().unprotect(), group.get_all_led_positions(self));
             num_leds.insert(group.id().unprotect(), group.led_count(self));
             fixture_chunks.insert(
