@@ -6,8 +6,6 @@ use crate::{id::DeviceId, led::LED};
 
 use super::manager::LEDDataOutput;
 
-// TODO: All of this is temporary.
-
 #[derive(Clone, Deserialize)]
 pub struct UDPSenderConfig {
     name: String,
