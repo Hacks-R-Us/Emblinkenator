@@ -1,8 +1,29 @@
-use protected_id::{self, generate_uuid, ProtectedId};
+#[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
+pub struct FixtureId {
+    #[protected_value]
+    id: String
+}
 
-protected_id!(FixtureId);
-protected_id!(InstallationId);
-protected_id!(GroupId);
-protected_id!(AnimationId);
-protected_id!(DeviceId);
-protected_id!(PipelineContextVersionId);
+#[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
+pub struct InstallationId {
+    #[protected_value]
+    id: String
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
+pub struct GroupId {
+    #[protected_value]
+    id: String
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
+pub struct AnimationId {
+    #[protected_value]
+    id: String
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
+pub struct DeviceId {
+    #[protected_value]
+    id: String
+}

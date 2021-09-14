@@ -343,7 +343,7 @@ dependencies = [
  "log",
  "parking_lot",
  "pollster",
- "protected-id",
+ "protected-id-derive",
  "rumqttc",
  "serde",
  "serde_json",
@@ -465,8 +465,8 @@ dependencies = [
  "autocfg",
  "proc-macro-hack",
  "proc-macro2",
- "quote",
- "syn",
+ "quote 1.0.9",
+ "syn 1.0.76",
 ]
 
 [[package]]
@@ -955,7 +955,7 @@ version = "1.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f5105d4fdaab20335ca9565e106a5d9b82b6219b5ba735731124ac6711d23d"
 dependencies = [
- "unicode-xid",
+ "unicode-xid 0.2.2",
 ]
 
 [[package]]
@@ -965,11 +965,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87dfd5592a8eed7e74f56ad7b125f8234763b805c30f0c7c95c486920026a6ec"
 
 [[package]]
-name = "protected-id"
+name = "protected-id-derive"
 version = "0.1.0"
 dependencies = [
+ "quote 0.3.15",
+ "syn 0.11.11",
  "uuid",
 ]
+
+[[package]]
+name = "quote"
+version = "0.3.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 
 [[package]]
 name = "quote"
@@ -1117,8 +1125,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7bc1a1ab1961464eae040d96713baa5a724a8152c1222492465b54322ec508b"
 dependencies = [
  "proc-macro2",
- "quote",
- "syn",
+ "quote 1.0.9",
+ "syn 1.0.76",
 ]
 
 [[package]]
@@ -1189,13 +1197,33 @@ dependencies = [
 
 [[package]]
 name = "syn"
+version = "0.11.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3b891b9015c88c576343b9b3e41c2c11a51c219ef067b264bd9c8aa9b441dad"
+dependencies = [
+ "quote 0.3.15",
+ "synom",
+ "unicode-xid 0.0.4",
+]
+
+[[package]]
+name = "syn"
 version = "1.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6f107db402c2c2055242dbf4d2af0e69197202e9faacbef9571bbe47f5a1b84"
 dependencies = [
  "proc-macro2",
- "quote",
- "unicode-xid",
+ "quote 1.0.9",
+ "unicode-xid 0.2.2",
+]
+
+[[package]]
+name = "synom"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a393066ed9010ebaed60b9eafa373d4b1baac186dd7e008555b0f702b51945b6"
+dependencies = [
+ "unicode-xid 0.0.4",
 ]
 
 [[package]]
@@ -1223,8 +1251,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bad553cc2c78e8de258400763a647e80e6d1b31ee237275d756f6836d204494c"
 dependencies = [
  "proc-macro2",
- "quote",
- "syn",
+ "quote 1.0.9",
+ "syn 1.0.76",
 ]
 
 [[package]]
@@ -1263,8 +1291,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54473be61f4ebe4efd09cec9bd5d16fa51d70ea0192213d754d2d500457db110"
 dependencies = [
  "proc-macro2",
- "quote",
- "syn",
+ "quote 1.0.9",
+ "syn 1.0.76",
 ]
 
 [[package]]
@@ -1297,8 +1325,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c42e6fa53307c8a17e4ccd4dc81cf5ec38db9209f59b222210375b54ee40d1e2"
 dependencies = [
  "proc-macro2",
- "quote",
- "syn",
+ "quote 1.0.9",
+ "syn 1.0.76",
 ]
 
 [[package]]
@@ -1336,6 +1364,12 @@ name = "unicode-width"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9337591893a19b88d8d87f2cec1e73fad5cdfd10e5a6f349f498ad6ea2ffb1e3"
+
+[[package]]
+name = "unicode-xid"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c1f860d7d29cf02cb2f3f359fd35991af3d30bac52c57d265a3c461074cb4dc"
 
 [[package]]
 name = "unicode-xid"
@@ -1390,8 +1424,8 @@ dependencies = [
  "lazy_static",
  "log",
  "proc-macro2",
- "quote",
- "syn",
+ "quote 1.0.9",
+ "syn 1.0.76",
  "wasm-bindgen-shared",
 ]
 
@@ -1413,7 +1447,7 @@ version = "0.2.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9d5a6580be83b19dc570a8f9c324251687ab2184e57086f71625feb57ec77c8"
 dependencies = [
- "quote",
+ "quote 1.0.9",
  "wasm-bindgen-macro-support",
 ]
 
@@ -1424,8 +1458,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3775a030dc6f5a0afd8a84981a21cc92a781eb429acef9ecce476d0c9113e92"
 dependencies = [
  "proc-macro2",
- "quote",
- "syn",
+ "quote 1.0.9",
+ "syn 1.0.76",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]

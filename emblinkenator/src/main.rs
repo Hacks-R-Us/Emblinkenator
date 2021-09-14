@@ -20,10 +20,10 @@ use parking_lot::RwLock;
 use pipeline::build_pipeline;
 use state::ThreadedObject;
 
-use crate::{animation::{manager::AnimationManager, AnimationTargetType}, config::{EmblinkenatorConfig, StartupAnimationTargetType, StartupConfig}, devices::{manager::{DeviceConfigType, DeviceType, LEDOutputConfigType}, mqtt::MQTTSender, udp::UDPSender}, id::{DeviceId, FixtureId, InstallationId, GroupId}, state::EmblinkenatorState, world::{Coord, context::{WorldContext, WorldContextCollection}, fixture::{Fixture, FixtureProps}}};
+use crate::{animation::{manager::AnimationManager, AnimationTargetType}, config::{EmblinkenatorConfig, StartupAnimationTargetType, StartupConfig}, devices::{manager::{DeviceConfigType, DeviceType, LEDOutputConfigType}, mqtt::MQTTSender, udp::UDPSender}, id::{DeviceId, FixtureId, GroupId, InstallationId}, state::EmblinkenatorState, world::{Coord, context::{WorldContext, WorldContextCollection}, fixture::{Fixture, FixtureProps}}};
 
 #[macro_use]
-extern crate protected_id;
+extern crate protected_id_derive;
 
 mod animation;
 mod config;

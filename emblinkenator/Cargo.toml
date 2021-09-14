@@ -11,7 +11,7 @@ pollster = "0.2.3"
 bytemuck = "1.5.1"
 rumqttc = "0.5.0"
 uuid = { version = "0.8", features = ["v4"] }
-protected-id = { path = "../../protected-id" }
+protected-id-derive = { path = "../protected-id-derive" }
 lazy_static = { version="1.4.0" }
 crossbeam = { version="0.8.1" }
 futures = { version="0.3.15" }

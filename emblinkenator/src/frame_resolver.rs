@@ -2,7 +2,6 @@ use std::{collections::HashMap, sync::Arc};
 
 use log::debug;
 use parking_lot::RwLock;
-use protected_id::ProtectedId;
 use tokio::sync::broadcast::{self, Receiver};
 
 use crate::{

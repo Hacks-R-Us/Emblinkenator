@@ -1,6 +1,5 @@
 mod compute_device;
 
-use protected_id::{unprotect_string, ProtectedId};
 use std::{collections::HashMap, convert::TryInto, mem, u64};
 
 use crate::{
@@ -155,9 +154,9 @@ impl EmblinkenatorPipeline {
         }
 
         let target_id = match &animation.target {
-            AnimationTargetType::Fixture(id) => unprotect_string(id),
-            AnimationTargetType::Installation(id) => unprotect_string(id),
-            AnimationTargetType::Group(id) => unprotect_string(id),
+            AnimationTargetType::Fixture(id) => id.unprotect(),
+            AnimationTargetType::Installation(id) => id.unprotect(),
+            AnimationTargetType::Group(id) => id.unprotect(),
         };
 
         let num_leds = context.num_leds.get(&target_id);

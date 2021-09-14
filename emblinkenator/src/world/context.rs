@@ -1,5 +1,4 @@
 use parking_lot::RwLock;
-use protected_id::ProtectedId;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},

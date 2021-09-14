@@ -1,4 +1,3 @@
-use protected_id::ProtectedId;
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use tokio::task;
 use serde::Deserialize;
