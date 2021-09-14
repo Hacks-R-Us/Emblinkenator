@@ -87,16 +87,6 @@ pub struct WorldContextState {
     pub fixture_chunks: HashMap<String, Vec<(FixtureId, u32)>>,
 }
 
-#[derive(Clone)]
-enum WorldContextOpqueue {
-    AddFixture(Fixture),
-    RemoveFixture(FixtureId),
-    AddInstallation(Installation),
-    RemoveInstallation(InstallationId),
-    AddGroup(Group),
-    RemoveGroup(GroupId),
-}
-
 impl WorldContext {
     pub fn new(collection: WorldContextCollection) -> WorldContext {
         let (tx, _) = broadcast::channel(16);

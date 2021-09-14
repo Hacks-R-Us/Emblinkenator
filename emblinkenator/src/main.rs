@@ -39,13 +39,11 @@ mod frame;
 mod frame_resolver;
 mod id;
 mod led;
-mod opqueue;
 mod pipeline;
 mod state;
 mod world;
 
 // TODO: Set workgroup_size as override constant (blocked, track https://github.com/gfx-rs/wgpu/issues/1762)
-// TODO: Open-source!
 
 #[tokio::main]
 async fn main() {
@@ -80,7 +78,7 @@ async fn main() {
         Arc::clone(&world_context),
         frame_resolver_buffer_reciever,
     );
-    let device_manager = DeviceManager::new(Arc::clone(&world_context));
+    let device_manager = DeviceManager::new();
     let pipeline = build_pipeline(leds_per_compute_group).await;
 
     // Put objects behind RwLock if they're not already

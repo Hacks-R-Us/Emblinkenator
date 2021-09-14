@@ -30,7 +30,6 @@ pub struct PipelineContext {
 
 struct PipelineEntry {
     id: String,
-    animation_id: AnimationId,
     target_id: String,
     storage_buffer: wgpu::Buffer,
     staging_buffer: wgpu::Buffer,
@@ -40,7 +39,6 @@ struct PipelineEntry {
     positions_data_buffer: wgpu::Buffer,
     num_leds: u32,
     result_size: u64,
-    positions_size: u64,
     work_group_count: u32,
 }
 
@@ -276,7 +274,6 @@ impl EmblinkenatorPipeline {
 
         self.compute_shaders.push(PipelineEntry {
             id: id.unprotect(),
-            animation_id: animation.id(),
             target_id,
             storage_buffer,
             staging_buffer,
@@ -285,7 +282,6 @@ impl EmblinkenatorPipeline {
             result_bind_group,
             positions_data_buffer,
             num_leds,
-            positions_size,
             work_group_count,
             result_size,
         });

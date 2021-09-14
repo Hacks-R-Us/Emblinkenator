@@ -1,20 +1,16 @@
 use log::{debug, error};
 use parking_lot::RwLock;
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
+use std::collections::HashMap;
 
 use tokio::sync::broadcast::{error::TryRecvError, Receiver};
 use serde::Deserialize;
 
-use crate::{frame_resolver::FrameResolverDataEvent, id::{DeviceId, FixtureId}, led::LED, state::ThreadedObject, world::context::WorldContext};
+use crate::{frame_resolver::FrameResolverDataEvent, id::{DeviceId, FixtureId}, led::LED, state::ThreadedObject};
 
 use super::{mqtt::MQTTSenderConfig, udp::UDPSenderConfig};
 
 pub struct DeviceManager {
     devices: RwLock<HashMap<DeviceId, DeviceType>>,
-    world_context: Arc<RwLock<WorldContext>>,
     subscribed_events: SubscribedEvents,
     fixture_to_device: HashMap<FixtureId, DeviceId>,
 }
@@ -57,10 +53,9 @@ enum DeviceManagerOpqueue {
 }
 
 impl DeviceManager {
-    pub fn new(world_context: Arc<RwLock<WorldContext>>) -> DeviceManager {
+    pub fn new() -> DeviceManager {
         DeviceManager {
             devices: RwLock::new(HashMap::new()),
-            world_context,
             subscribed_events: SubscribedEvents {
                 frame_resolver: vec![],
             },

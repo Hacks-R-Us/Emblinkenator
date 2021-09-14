@@ -4,19 +4,16 @@ use log::info;
 use wgpu::util::DeviceExt;
 
 pub struct EmblinkenatorComputeDevice {
-    adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
 }
 
 impl EmblinkenatorComputeDevice {
     fn new(
-        adapter: wgpu::Adapter,
         device: wgpu::Device,
         queue: wgpu::Queue,
     ) -> EmblinkenatorComputeDevice {
         EmblinkenatorComputeDevice {
-            adapter,
             device,
             queue,
         }
@@ -225,5 +222,5 @@ pub async fn build_compute_device() -> EmblinkenatorComputeDevice {
         .await
         .expect("Unable to find a suitable GPU adapter!");
 
-    EmblinkenatorComputeDevice::new(adapter, device, queue)
+    EmblinkenatorComputeDevice::new(device, queue)
 }
