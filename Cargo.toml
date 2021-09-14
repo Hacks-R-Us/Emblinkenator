@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
 	"emblinkenator",
-	"pipeline",
 	"protected-id-derive"
 ]
 default-members = [
