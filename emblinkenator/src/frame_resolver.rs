@@ -54,8 +54,6 @@ impl ThreadedObject for FrameResolver {
         let mut intermediate_data: HashMap<AnimationTargetType, FrameIntermediate> = HashMap::new(); // TODO: Map<LayerId, Vec<FrameIntermediate>>
         let mut compute_outputs: Vec<PipelineFrameOutput> = vec![];
 
-        debug!("Recv data");
-
         let message = self.input_data_buffer.try_recv();
         match message {
             Ok(msg) => compute_outputs.push(msg),

@@ -50,7 +50,7 @@ async fn main() {
     setup_logging().unwrap();
 
     if !Path::exists(Path::new("config.json")) {
-        let default_config = EmblinkenatorConfig::new(25, 10, 100);
+        let default_config = EmblinkenatorConfig::new(10, 25, 100);
         fs::write("config.json", serde_json::to_string(&default_config).unwrap()).expect("Unable to create config file");
     }
 
@@ -106,10 +106,13 @@ async fn main() {
         let startup_config_json = fs::read_to_string("startup_config.json").expect("Unable to read startup config file");
         let startup_config: StartupConfig = serde_json::from_str(&startup_config_json).unwrap();
         for fixture in startup_config.fixtures {
-            let positions = match fixture.led_positions {
+            let mut positions = match fixture.led_positions {
                 Some(positions) => positions,
                 None => vec![Coord::origin(); fixture.num_leds as usize]
             };
+            if positions.len() != fixture.num_leds as usize {
+                positions = vec![Coord::origin(); fixture.num_leds as usize]
+            }
             world_context.write().add_fixture(
                 Fixture::new(
                     FixtureId::new_from(fixture.id),
