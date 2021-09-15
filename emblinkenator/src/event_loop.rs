@@ -1,13 +1,9 @@
-use std::u128;
+use std::{collections::HashMap, u128};
 
 use log::{debug, info};
 use tokio::time::{self, Instant, Interval};
 
-use crate::{
-    frame::FrameData,
-    frame_resolver::FrameResolverInput,
-    pipeline::{ComputeOutput, EmblinkenatorPipeline, PipelineContext},
-};
+use crate::{frame::FrameData, led::LED, pipeline::{ComputeOutput, EmblinkenatorPipeline, PipelineContext}};
 
 pub struct GPUEventLoop {
     state: GPUEventLoopState,
@@ -16,7 +12,7 @@ pub struct GPUEventLoop {
     frame_data: FrameData,
     clock_frame: Interval,
     pipeline_context_buffer: crossbeam::channel::Receiver<PipelineContext>,
-    frame_output_buffer: crossbeam::channel::Sender<FrameResolverInput>,
+    frame_output_buffer: tokio::sync::broadcast::Sender<PipelineFrameOutput>,
     frame_state: Option<EventLoopFrameState>,
 }
 
@@ -42,12 +38,17 @@ struct EventLoopFrameState {
     pub frame_start: Instant,
 }
 
+#[derive(Debug, Clone)]
+pub struct PipelineFrameOutput {
+    pub states: HashMap<String, Vec<LED>>,
+}
+
 impl GPUEventLoop {
     pub fn new(
         pipeline: EmblinkenatorPipeline,
         frame_rate: u32,
         pipeline_context_buffer: crossbeam::channel::Receiver<PipelineContext>,
-        frame_output_buffer: crossbeam::channel::Sender<FrameResolverInput>,
+        frame_output_buffer: tokio::sync::broadcast::Sender<PipelineFrameOutput>,
     ) -> GPUEventLoop {
         // TODO: Dodgy!
         let frame_time: u64 = u64::from(1000 / frame_rate);
@@ -141,7 +142,7 @@ impl GPUEventLoop {
         debug!("Output data");
 
         if let Some(frame_state) = &self.frame_state.as_ref().unwrap().last_frame_state {
-            let output: FrameResolverInput = FrameResolverInput {
+            let output: PipelineFrameOutput = PipelineFrameOutput {
                 states: frame_state.states.clone(),
             };
 

@@ -1,21 +1,15 @@
 use std::{collections::HashMap, sync::Arc};
 
-use log::debug;
+use log::{debug, info, warn};
 use parking_lot::RwLock;
-use tokio::sync::broadcast::{self, Receiver};
+use tokio::sync::broadcast::{self, Receiver, error::TryRecvError};
 
-use crate::{
-    animation::{manager::AnimationManager, AnimationTargetType},
-    id::{AnimationId, FixtureId},
-    led::LED,
-    state::ThreadedObject,
-    world::context::WorldContext,
-};
+use crate::{animation::{manager::AnimationManager, AnimationTargetType}, event_loop::PipelineFrameOutput, id::{AnimationId, FixtureId}, led::LED, state::ThreadedObject, world::context::WorldContext};
 
 const DATA_EVENT_CHANNEL_CAPACITY: usize = 60;
 
 pub struct FrameResolver {
-    input_data_buffer: crossbeam::channel::Receiver<FrameResolverInput>,
+    input_data_buffer: Receiver<PipelineFrameOutput>,
     animation_manager: Arc<RwLock<AnimationManager>>,
     world_context: Arc<RwLock<WorldContext>>,
     event_emitters: FrameResolverEventEmitters,
@@ -31,10 +25,6 @@ pub struct FrameResolverDataEvent {
     pub data: Vec<LED>,
 }
 
-pub struct FrameResolverInput {
-    pub states: HashMap<String, Vec<LED>>,
-}
-
 struct FrameIntermediate {
     data: Vec<LED>,
     priority: u32,
@@ -44,7 +34,7 @@ impl FrameResolver {
     pub fn new(
         animation_manager: Arc<RwLock<AnimationManager>>,
         world_context: Arc<RwLock<WorldContext>>,
-        input_data_buffer: crossbeam::channel::Receiver<FrameResolverInput>,
+        input_data_buffer: Receiver<PipelineFrameOutput>,
     ) -> FrameResolver {
         FrameResolver {
             input_data_buffer,
@@ -62,15 +52,19 @@ impl FrameResolver {
 impl ThreadedObject for FrameResolver {
     fn run(&mut self) {
         let mut intermediate_data: HashMap<AnimationTargetType, FrameIntermediate> = HashMap::new(); // TODO: Map<LayerId, Vec<FrameIntermediate>>
-        let mut compute_outputs: Vec<FrameResolverInput> = vec![];
+        let mut compute_outputs: Vec<PipelineFrameOutput> = vec![];
 
         debug!("Recv data");
 
-        let message = self.input_data_buffer.recv();
+        let message = self.input_data_buffer.try_recv();
         match message {
             Ok(msg) => compute_outputs.push(msg),
-            Err(_) => {
-                panic!("Pipeline message queue closed early");
+            Err(err) => {
+                match err {
+                    TryRecvError::Lagged(frames) => warn!("Frame resolver lagged by {} frames", frames),
+                    TryRecvError::Closed => panic!("Pipeline message queue closed early"),
+                    TryRecvError::Empty => {}
+                }
             }
         }
 

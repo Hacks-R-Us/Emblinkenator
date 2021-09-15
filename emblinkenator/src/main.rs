@@ -63,7 +63,7 @@ async fn main() {
 
     // Create buffers for state transfer
     let (frame_resolver_buffer_sender, frame_resolver_buffer_reciever) =
-        crossbeam::channel::bounded(emblinkenator_config.frame_buffer_size() as _);
+        tokio::sync::broadcast::channel(emblinkenator_config.frame_buffer_size() as _);
     let (pipeline_context_buffer_sender, pipeline_context_buffer_reciever) =
         crossbeam::channel::bounded(emblinkenator_config.frame_buffer_size() as _);
 
