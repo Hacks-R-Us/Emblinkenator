@@ -1,12 +1,11 @@
+use log::{error, warn};
 use rumqttc::{AsyncClient, MqttOptions, QoS};
-use tokio::task;
+use tokio::{sync::broadcast::{Receiver, error::TryRecvError}, task};
 use serde::Deserialize;
 
 use crate::{id::DeviceId, led::LED};
 
-use super::manager::LEDDataOutput;
-
-// TODO: All of this is temporary.
+use super::{manager::LEDDataOutput, threaded_device::ThreadedDevice};
 
 #[derive(Clone, Deserialize)]
 pub struct MQTTSenderConfig {
@@ -40,6 +39,7 @@ pub struct MQTTSender {
     name: String,
     client: AsyncClient,
     topic: String,
+    data_buffer: Option<Receiver<Vec<LED>>>
 }
 
 impl MQTTSender {
@@ -64,19 +64,37 @@ impl MQTTSender {
             name: config.name,
             client,
             topic: config.topic,
+            data_buffer: None
         }
     }
 }
 
 impl LEDDataOutput for MQTTSender {
-    fn on_frame(&self, frame: Vec<LED>) {
-        let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
-        pollster::block_on(self.client.publish(
-            self.topic.clone(),
-            QoS::ExactlyOnce,
-            true,
-            payload,
-        ))
-        .unwrap(); // TODO: This will panic, block, generally do bad things
+    fn set_data_buffer(&mut self, receiver: Receiver<Vec<LED>>) {
+        self.data_buffer.replace(receiver);
+    }
+}
+
+impl ThreadedDevice for MQTTSender {
+    fn run(&mut self) {
+        if let Some(buffer) = &mut self.data_buffer {
+            match buffer.try_recv() {
+                Err(err) => match err {
+                    TryRecvError::Lagged(missed) => warn!("MQTT device lagged by {} frames! (MQTT Device {})", missed, self.id.unprotect()),
+                    TryRecvError::Closed => error!("Data buffer exists but is closed! (MQTT Device {})", self.id.unprotect()),
+                    TryRecvError::Empty => {}
+                },
+                Ok(frame) => {
+                    let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
+                    pollster::block_on(self.client.publish(
+                        self.topic.clone(),
+                        QoS::ExactlyOnce,
+                        true,
+                        payload,
+                    ))
+                    .unwrap(); // TODO: This will panic and generally do bad things
+                }
+            }
+        }
     }
 }

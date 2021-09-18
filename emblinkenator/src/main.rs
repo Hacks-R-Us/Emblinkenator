@@ -1,5 +1,6 @@
 #![feature(drain_filter)]
 #![feature(map_try_insert)]
+#![feature(trait_upcasting)]
 
 #![deny(clippy::all)]
 #![warn(clippy::perf)]
@@ -22,7 +23,7 @@ use state::ThreadedObject;
 
 use crate::animation::{manager::AnimationManager, AnimationTargetType};
 use crate::config::{EmblinkenatorConfig, StartupAnimationTargetType, StartupConfig};
-use crate::devices::{manager::{DeviceConfigType, DeviceType, LEDOutputConfigType}, mqtt::MQTTSender, udp::UDPSender};
+use crate::devices::{manager::{DeviceConfigType, LEDOutputConfigType}, mqtt::MQTTSender, udp::UDPSender};
 use crate::id::{DeviceId, FixtureId, GroupId, InstallationId};
 use crate::state::EmblinkenatorState;
 use crate::world::{Coord, context::{WorldContext, WorldContextCollection}, fixture::{Fixture, FixtureProps}};
@@ -138,16 +139,16 @@ async fn main() {
                 DeviceConfigType::LEDDataOutput(output) => match output {
                         LEDOutputConfigType::MQTT(config) => {
                             let mqtt_device = MQTTSender::new(DeviceId::new_from(startup_device.id.clone()), config);
-                            device_manager.write().add_device(
+                            device_manager.write().add_led_device(
                                 DeviceId::new_from(startup_device.id.clone()),
-                                DeviceType::LEDDataOutput(Box::new(mqtt_device))
+                                Box::new(mqtt_device)
                             );
                         },
                         LEDOutputConfigType::UDP(config) => {
                             let udp_device = UDPSender::new(DeviceId::new_from(startup_device.id.clone()), config);
-                            device_manager.write().add_device(
+                            device_manager.write().add_led_device(
                                 DeviceId::new_from(startup_device.id.clone()),
-                                DeviceType::LEDDataOutput(Box::new(udp_device))
+                                Box::new(udp_device)
                             );
                         }
                 }

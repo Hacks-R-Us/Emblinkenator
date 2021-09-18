@@ -1,22 +1,19 @@
 use log::{debug, error};
 use parking_lot::RwLock;
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
-use tokio::sync::broadcast::{error::TryRecvError, Receiver};
+use tokio::sync::broadcast::{Receiver, Sender, channel, error::TryRecvError};
 use serde::Deserialize;
 
 use crate::{frame_resolver::FrameResolverDataEvent, id::{DeviceId, FixtureId}, led::LED, state::ThreadedObject};
 
-use super::{mqtt::MQTTSenderConfig, udp::UDPSenderConfig};
+use super::{mqtt::MQTTSenderConfig, threaded_device::{ThreadedDevice, ThreadedDeviceWrapper}, udp::UDPSenderConfig};
 
 pub struct DeviceManager {
-    devices: RwLock<HashMap<DeviceId, DeviceType>>,
+    devices: RwLock<HashMap<DeviceId, ThreadedDeviceWrapper>>,
+    led_data_buffers: RwLock<HashMap<DeviceId, Sender<Vec<LED>>>>,
     subscribed_events: SubscribedEvents,
     fixture_to_device: HashMap<FixtureId, DeviceId>,
-}
-
-pub enum DeviceType {
-    LEDDataOutput(Box<dyn LEDDataOutput>),
 }
 
 #[derive(Deserialize)]
@@ -31,8 +28,8 @@ pub enum LEDOutputConfigType {
     UDP(UDPSenderConfig)
 }
 
-pub trait LEDDataOutput: Send + Sync {
-    fn on_frame(&self, frame: Vec<LED>);
+pub trait LEDDataOutput: ThreadedDevice {
+    fn set_data_buffer(&mut self, receiver: Receiver<Vec<LED>>);
 }
 
 pub enum DeviceManagerErrorAddDevice {
@@ -47,15 +44,11 @@ struct SubscribedEvents {
     frame_resolver: Vec<Receiver<FrameResolverDataEvent>>,
 }
 
-enum DeviceManagerOpqueue {
-    AddDevice(DeviceType),
-    RemoveDevice(DeviceId),
-}
-
 impl DeviceManager {
     pub fn new() -> DeviceManager {
         DeviceManager {
             devices: RwLock::new(HashMap::new()),
+            led_data_buffers: RwLock::new(HashMap::new()),
             subscribed_events: SubscribedEvents {
                 frame_resolver: vec![],
             },
@@ -63,8 +56,13 @@ impl DeviceManager {
         }
     }
 
-    pub fn add_device(&self, id: DeviceId, device: DeviceType) {
-        self.devices.write().insert(id, device);
+    pub fn add_led_device(&self, id: DeviceId, mut device: Box<dyn LEDDataOutput>) {
+        let (sender, receiver) = channel(10); // TODO: Get channel size from config
+        device.set_data_buffer(receiver);
+
+        let threaded_device = ThreadedDeviceWrapper::new(device);
+        self.devices.write().insert(id.clone(), threaded_device);
+        self.led_data_buffers.write().insert(id, sender);
     }
 
     pub fn remove_device(&self, _id: DeviceId) {}
@@ -110,10 +108,8 @@ impl ThreadedObject for DeviceManager {
                 continue;
             }
             let device_id = device_id.unwrap();
-            if let Some(device) = self.devices.read().get(device_id) {
-                match device {
-                    DeviceType::LEDDataOutput(device) => device.on_frame(event.data)
-                }
+            if let Some(sender) = self.led_data_buffers.read().get(device_id) {
+                sender.send(event.data).ok();
             }
         }
     }
