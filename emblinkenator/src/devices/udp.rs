@@ -62,8 +62,8 @@ impl ThreadedDevice for UDPSender {
         if let Some(buffer) = &mut self.data_buffer {
             match buffer.try_recv() {
                 Err(err) => match err {
-                    TryRecvError::Lagged(missed) => warn!("MQTT device lagged by {} frames! (MQTT Device {})", missed, self.id.unprotect()),
-                    TryRecvError::Closed => error!("Data buffer exists but is closed! (MQTT Device {})", self.id.unprotect()),
+                    TryRecvError::Lagged(missed) => warn!("UDP device lagged by {} frames! (UDP Device {})", missed, self.id.unprotect()),
+                    TryRecvError::Closed => error!("Data buffer exists but is closed! (UDP Device {})", self.id.unprotect()),
                     TryRecvError::Empty => {}
                 },
                 Ok(frame) => {
