@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::{frame_resolver::FrameResolverDataEvent, id::{DeviceId, FixtureId}, led::LED, state::ThreadedObject};
 
-use super::{mqtt::MQTTSenderConfig, threaded_device::{ThreadedDevice, ThreadedDeviceWrapper}, udp::UDPSenderConfig};
+use super::{led_output::{LEDDataOutput, mqtt::MQTTSenderConfig, udp::UDPSenderConfig}, threaded_device::ThreadedDeviceWrapper};
 
 pub struct DeviceManager {
     devices: RwLock<HashMap<DeviceId, ThreadedDeviceWrapper>>,
@@ -26,10 +26,6 @@ pub enum DeviceConfigType {
 pub enum LEDOutputConfigType {
     MQTT(MQTTSenderConfig),
     UDP(UDPSenderConfig)
-}
-
-pub trait LEDDataOutput: ThreadedDevice {
-    fn set_data_buffer(&mut self, receiver: Receiver<Vec<LED>>);
 }
 
 pub enum DeviceManagerErrorAddDevice {

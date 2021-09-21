@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     id::{AnimationId, FixtureId, GroupId, InstallationId},
     world::{context::WorldContext, Coord},
@@ -20,6 +22,11 @@ pub enum AnimationTargetType {
     Fixture(FixtureId),
     Installation(InstallationId),
     Group(GroupId),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ShadersConfig {
+    shader_folders: Vec<String>
 }
 
 pub trait AnimationTarget {
@@ -46,5 +53,11 @@ impl Animation {
 
     pub fn get_target_type(&self) -> AnimationTargetType {
         self.target.clone()
+    }
+}
+
+impl Default for ShadersConfig {
+    fn default() -> Self {
+        Self { shader_folders: vec!["shaders".to_string()] }
     }
 }

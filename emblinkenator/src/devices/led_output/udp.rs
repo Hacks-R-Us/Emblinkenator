@@ -4,9 +4,9 @@ use serde::Deserialize;
 use tokio::sync::broadcast::{Receiver, error::TryRecvError};
 use std::net::UdpSocket;
 
-use crate::{id::DeviceId, led::LED};
+use crate::{devices::threaded_device::ThreadedDevice, id::DeviceId, led::LED};
 
-use super::{manager::LEDDataOutput, threaded_device::ThreadedDevice};
+use super::LEDDataOutput;
 
 #[derive(Clone, Deserialize)]
 pub struct UDPSenderConfig {

@@ -2,13 +2,7 @@ mod compute_device;
 
 use std::{collections::HashMap, convert::TryInto, mem, u64};
 
-use crate::{
-    animation::{Animation, AnimationTargetType},
-    frame::FrameData,
-    id::AnimationId,
-    led::LED,
-    world::Coord,
-};
+use crate::{animation::{Animation, AnimationTargetType}, auxiliary_data::AuxiliaryDataType, frame::FrameData, id::{AnimationId, AuxiliaryId}, led::LED, world::Coord};
 use compute_device::{build_compute_device, EmblinkenatorComputeDevice};
 
 pub struct EmblinkenatorPipeline {
@@ -26,6 +20,7 @@ pub struct PipelineContext {
     pub led_positions: HashMap<String, Vec<Coord>>,
     pub num_leds: HashMap<String, u32>,
     pub animations: HashMap<AnimationId, Animation>,
+    pub auxiliary_data: HashMap<AnimationId, Vec<AuxiliaryDataType>>
 }
 
 struct PipelineEntry {
@@ -72,6 +67,7 @@ impl PipelineContext {
             num_leds: HashMap::new(),
             led_positions: HashMap::new(),
             animations: HashMap::new(),
+            auxiliary_data: HashMap::new()
         }
     }
 }

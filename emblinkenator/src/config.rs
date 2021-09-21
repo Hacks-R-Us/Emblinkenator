@@ -2,35 +2,14 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{devices::manager::DeviceConfigType, world::Coord};
+use crate::{animation::ShadersConfig, devices::manager::DeviceConfigType, world::Coord};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmblinkenatorConfig {
-    frame_buffer_size: u32,
-    frame_rate: u32,
-    leds_per_compute_group: u32
-}
-
-impl EmblinkenatorConfig {
-    pub fn new (frame_buffer_size: u32, frame_rate: u32, leds_per_compute_group: u32) -> Self {
-        EmblinkenatorConfig {
-            frame_buffer_size,
-            frame_rate,
-            leds_per_compute_group
-        }
-    }
-
-    pub fn frame_buffer_size (&self) -> u32 {
-        self.frame_buffer_size
-    }
-
-    pub fn frame_rate (&self) -> u32 {
-        self.frame_rate
-    }
-
-    pub fn leds_per_compute_group (&self) -> u32 {
-        self.leds_per_compute_group
-    }
+    pub frame_buffer_size: u32,
+    pub frame_rate: u32,
+    pub leds_per_compute_group: u32,
+    pub shaders: ShadersConfig
 }
 
 // Temporary solution for adding some devices before a UI comes into existence
@@ -66,4 +45,33 @@ pub enum StartupAnimationTargetType {
     Fixture(String),
     Installation(String),
     Group(String)
+}
+
+impl EmblinkenatorConfig {
+    pub fn new (frame_buffer_size: u32, frame_rate: u32, leds_per_compute_group: u32, shaders: ShadersConfig) -> Self {
+        EmblinkenatorConfig {
+            frame_buffer_size,
+            frame_rate,
+            leds_per_compute_group,
+            shaders
+        }
+    }
+
+    pub fn frame_buffer_size (&self) -> u32 {
+        self.frame_buffer_size
+    }
+
+    pub fn frame_rate (&self) -> u32 {
+        self.frame_rate
+    }
+
+    pub fn leds_per_compute_group (&self) -> u32 {
+        self.leds_per_compute_group
+    }
+}
+
+impl Default for EmblinkenatorConfig {
+    fn default() -> Self {
+        Self { frame_buffer_size: 10, frame_rate: 25, leds_per_compute_group: 100, shaders: ShadersConfig::default() }
+    }
 }

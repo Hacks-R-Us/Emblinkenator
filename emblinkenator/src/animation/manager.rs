@@ -3,10 +3,7 @@ use std::sync::Mutex;
 
 use crate::id::AnimationId;
 
-use super::{
-    factory::{get_animation_registry, AnimationRegistry},
-    Animation, AnimationTargetType,
-};
+use super::{Animation, AnimationTargetType, ShadersConfig, factory::{get_animation_registry, AnimationRegistry}};
 
 pub struct AnimationManager {
     registry: AnimationRegistry,
@@ -18,16 +15,13 @@ pub enum AnimationManagerError {
     AnimationIsNotRegistered,
 }
 
-#[derive(Clone)]
-enum AnimationManagerOplog {}
-
 pub trait RecvAnimationManagerState: Send + Sync {
     fn recv(&self, state: HashMap<AnimationId, Animation>);
 }
 
 impl AnimationManager {
-    pub fn new() -> AnimationManager {
-        let animation_registry = get_animation_registry();
+    pub fn new(config: &ShadersConfig) -> AnimationManager {
+        let animation_registry = get_animation_registry(config);
 
         AnimationManager {
             registry: animation_registry,

@@ -1,7 +1,8 @@
-use std::{collections::HashMap, u128};
+use std::collections::HashMap;
 
-use log::{debug, info};
-use tokio::time::{self, Instant, Interval};
+use crossbeam::channel::Receiver;
+use log::debug;
+use tokio::time::Instant;
 
 use crate::{frame::FrameData, led::LED, pipeline::{ComputeOutput, EmblinkenatorPipeline, PipelineContext}};
 
@@ -9,8 +10,7 @@ pub struct GPUEventLoop {
     state: GPUEventLoopState,
     command_queue: Vec<GPUEventLoopQueue>,
     pipeline: EmblinkenatorPipeline,
-    frame_data: FrameData,
-    clock_frame: Interval,
+    frame_data_buffer: Receiver<FrameData>,
     pipeline_context_buffer: crossbeam::channel::Receiver<PipelineContext>,
     frame_output_buffer: tokio::sync::broadcast::Sender<PipelineFrameOutput>,
     frame_state: Option<EventLoopFrameState>,
@@ -24,7 +24,6 @@ enum GPUEventLoopState {
     ReadDataFromGPU,
     OutputData,
     FrameEnd,
-    WaitForSync,
 }
 
 #[derive(Debug, PartialEq)]
@@ -46,23 +45,16 @@ pub struct PipelineFrameOutput {
 impl GPUEventLoop {
     pub fn new(
         pipeline: EmblinkenatorPipeline,
-        frame_rate: u32,
+        frame_data_buffer: crossbeam::channel::Receiver<FrameData>,
         pipeline_context_buffer: crossbeam::channel::Receiver<PipelineContext>,
         frame_output_buffer: tokio::sync::broadcast::Sender<PipelineFrameOutput>,
     ) -> GPUEventLoop {
-        // TODO: Dodgy!
-        let frame_time: u64 = u64::from(1000 / frame_rate);
-        let clock_frame = time::interval(time::Duration::from_millis(frame_time));
 
         GPUEventLoop {
             state: GPUEventLoopState::Paused,
             command_queue: vec![],
             pipeline,
-            frame_data: FrameData {
-                frame: 0,
-                frame_rate,
-            },
-            clock_frame,
+            frame_data_buffer,
             pipeline_context_buffer,
             frame_output_buffer,
             frame_state: None,
@@ -71,7 +63,6 @@ impl GPUEventLoop {
 
     pub async fn run(&mut self) {
         self.state = GPUEventLoopState::BeforeFrame;
-        self.frame_data.frame = 1;
 
         // TODO: Any awaited steps here should likely either block directly or be run in a polling mode. May be waiting on upstream WebGPU work.
         'eventloop: loop {
@@ -83,7 +74,6 @@ impl GPUEventLoop {
                 GPUEventLoopState::ReadDataFromGPU => self.loop_step_read_data_from_gpu().await,
                 GPUEventLoopState::OutputData => self.loop_step_output_data(),
                 GPUEventLoopState::FrameEnd => self.loop_step_frame_end().await,
-                GPUEventLoopState::WaitForSync => self.loop_step_wait_for_sync().await,
             }
 
             for command in &self.command_queue {
@@ -107,8 +97,10 @@ impl GPUEventLoop {
     }
 
     fn loop_step_compute(&mut self) {
-        debug!("Compute Frame {}", self.frame_data.frame);
-        self.pipeline.compute_frame(&self.frame_data).unwrap();
+        let frame_data = self.frame_data_buffer.recv().expect("Frame data buffer closed");
+        debug!("Compute Frame {}", frame_data.frame);
+
+        self.pipeline.compute_frame(&frame_data).unwrap();
 
         self.next_state();
     }
@@ -131,13 +123,6 @@ impl GPUEventLoop {
         self.next_state();
     }
 
-    async fn loop_step_wait_for_sync(&mut self) {
-        debug!("Wait for sync");
-        self.clock_frame.tick().await;
-
-        self.next_state();
-    }
-
     fn loop_step_output_data(&mut self) {
         debug!("Output data");
 
@@ -155,23 +140,6 @@ impl GPUEventLoop {
     async fn loop_step_frame_end<'a>(&mut self) {
         debug!("Frame end");
 
-        if let Some(prev_state) = self.frame_state.as_ref() {
-            // TODO: Dodgy!
-            let frame_time: u128 = u128::from(1000 / self.frame_data.frame_rate);
-            let elapsed_time = Instant::now()
-                .duration_since(prev_state.frame_start)
-                .as_millis();
-
-            if elapsed_time > frame_time {
-                info!(
-                    "Running late by {}ms (Took {}ms)",
-                    elapsed_time - frame_time,
-                    elapsed_time
-                );
-            }
-        }
-
-        self.frame_data.frame += 1;
         self.next_state();
     }
 
@@ -183,8 +151,7 @@ impl GPUEventLoop {
             GPUEventLoopState::WaitForGPUIdle => GPUEventLoopState::ReadDataFromGPU,
             GPUEventLoopState::ReadDataFromGPU => GPUEventLoopState::OutputData,
             GPUEventLoopState::OutputData => GPUEventLoopState::FrameEnd,
-            GPUEventLoopState::FrameEnd => GPUEventLoopState::WaitForSync,
-            GPUEventLoopState::WaitForSync => GPUEventLoopState::BeforeFrame,
+            GPUEventLoopState::FrameEnd => GPUEventLoopState::BeforeFrame,
         }
     }
 }

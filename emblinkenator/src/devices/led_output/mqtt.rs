@@ -3,9 +3,9 @@ use rumqttc::{AsyncClient, MqttOptions, QoS};
 use tokio::{sync::broadcast::{Receiver, error::TryRecvError}, task};
 use serde::Deserialize;
 
-use crate::{id::DeviceId, led::LED};
+use crate::{devices::threaded_device::ThreadedDevice, id::DeviceId, led::LED};
 
-use super::{manager::LEDDataOutput, threaded_device::ThreadedDevice};
+use super::LEDDataOutput;
 
 #[derive(Clone, Deserialize)]
 pub struct MQTTSenderConfig {

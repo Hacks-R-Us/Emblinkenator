@@ -9,7 +9,7 @@
 #![deny(clippy::print_stdout)]
 #![deny(clippy::cast_lossless)]
 
-use std::{fs, path::Path, sync::Arc, thread::{self, JoinHandle}};
+use std::{fs, path::Path, sync::Arc, thread::{self, JoinHandle, sleep}, time::Duration};
 
 use color_eyre::Report;
 
@@ -21,9 +21,9 @@ use parking_lot::RwLock;
 use pipeline::build_pipeline;
 use state::ThreadedObject;
 
-use crate::animation::{manager::AnimationManager, AnimationTargetType};
+use crate::{animation::{manager::AnimationManager, AnimationTargetType}, auxiliary_data::AuxiliaryDataManager, frame::FrameTimeKeeper};
 use crate::config::{EmblinkenatorConfig, StartupAnimationTargetType, StartupConfig};
-use crate::devices::{manager::{DeviceConfigType, LEDOutputConfigType}, mqtt::MQTTSender, udp::UDPSender};
+use crate::devices::{manager::{DeviceConfigType, LEDOutputConfigType}, led_output::{mqtt::MQTTSender, udp::UDPSender}};
 use crate::id::{DeviceId, FixtureId, GroupId, InstallationId};
 use crate::state::EmblinkenatorState;
 use crate::world::{Coord, context::{WorldContext, WorldContextCollection}, fixture::{Fixture, FixtureProps}};
@@ -32,6 +32,7 @@ use crate::world::{Coord, context::{WorldContext, WorldContextCollection}, fixtu
 extern crate protected_id_derive;
 
 mod animation;
+mod auxiliary_data;
 mod config;
 mod devices;
 mod event_loop;
@@ -51,7 +52,7 @@ async fn main() {
     setup_logging().unwrap();
 
     if !Path::exists(Path::new("config.json")) {
-        let default_config = EmblinkenatorConfig::new(10, 25, 100);
+        let default_config = EmblinkenatorConfig::default();
         fs::write("config.json", serde_json::to_string(&default_config).unwrap()).expect("Unable to create config file");
     }
 
@@ -67,31 +68,40 @@ async fn main() {
         tokio::sync::broadcast::channel(emblinkenator_config.frame_buffer_size() as _);
     let (pipeline_context_buffer_sender, pipeline_context_buffer_reciever) =
         crossbeam::channel::bounded(emblinkenator_config.frame_buffer_size() as _);
+    let (event_loop_frame_data_buffer_sender, event_loop_frame_data_buffer_receiver) = crossbeam::channel::bounded(1);
 
     // Collections
     let world_context_collection = WorldContextCollection::new();
 
+    // Applies backpressure to move to next frame in time
+    let frame_time_keeper = FrameTimeKeeper::new(frame_rate);
+    frame_time_keeper.send_frame_data_to(event_loop_frame_data_buffer_sender);
+
     // Create state objects
     let world_context = Arc::new(RwLock::new(WorldContext::new(world_context_collection)));
-    let animation_manager = Arc::new(RwLock::new(AnimationManager::new()));
+    let animation_manager = Arc::new(RwLock::new(AnimationManager::new(&emblinkenator_config.shaders)));
     let frame_resolver = FrameResolver::new(
         Arc::clone(&animation_manager),
         Arc::clone(&world_context),
         frame_resolver_buffer_reciever,
     );
     let device_manager = DeviceManager::new();
+    let auxiliary_manager = AuxiliaryDataManager::new();
     let pipeline = build_pipeline(leds_per_compute_group).await;
 
     // Put objects behind RwLock if they're not already
+    let frame_time_keeper = Arc::new(RwLock::new(frame_time_keeper));
     let frame_resolver = Arc::new(RwLock::new(frame_resolver));
     let device_manager = Arc::new(RwLock::new(device_manager));
+    let auxiliary_manager = Arc::new(RwLock::new(auxiliary_manager));
 
     // State manager
-    let state = EmblinkenatorState::new(
+    let mut state = EmblinkenatorState::new(
         Arc::clone(&animation_manager),
+        Arc::clone(&auxiliary_manager),
         Arc::clone(&world_context),
-        pipeline_context_buffer_sender,
     );
+    state.send_pipeline_context_to(pipeline_context_buffer_sender);
 
     let state = Arc::new(RwLock::new(state));
 
@@ -162,14 +172,14 @@ async fn main() {
 
     let mut event_loop = GPUEventLoop::new(
         pipeline,
-        frame_rate,
+        event_loop_frame_data_buffer_receiver,
         pipeline_context_buffer_reciever,
         frame_resolver_buffer_sender,
     );
 
     // Register objects with work loops
     let threaded_objects: Vec<Arc<RwLock<dyn ThreadedObject>>> =
-        vec![frame_resolver, state, device_manager];
+        vec![frame_time_keeper, frame_resolver, state, device_manager];
     let mut handles: Vec<JoinHandle<()>> = vec![];
 
     // Exists to make Rust compiler happy for now, should probably be linked to a stop button somewhere
@@ -178,6 +188,8 @@ async fn main() {
     for obj in threaded_objects {
         let handle = thread::spawn(move || 'work: loop {
             obj.write().run();
+
+            sleep(Duration::from_millis(1));
 
             if !running {
                 break 'work;
@@ -189,6 +201,8 @@ async fn main() {
     // TODO: Remove this once event_loop is no longer async (when polling)
     handles.push(thread::spawn(move || 'work: loop {
         block_on(event_loop.run());
+
+        sleep(Duration::from_millis(1));
 
         if running {
             break 'work;

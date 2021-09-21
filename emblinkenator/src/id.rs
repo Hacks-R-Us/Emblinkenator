@@ -27,3 +27,9 @@ pub struct DeviceId {
     #[protected_value]
     id: String
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
+pub struct AuxiliaryId {
+    #[protected_value]
+    id: String
+}

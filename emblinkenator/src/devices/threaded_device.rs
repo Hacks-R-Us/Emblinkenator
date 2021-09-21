@@ -1,4 +1,4 @@
-use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::{self, JoinHandle}};
+use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::{self, JoinHandle, sleep}, time::Duration};
 
 pub struct ThreadedDeviceWrapper {
     running: Arc<AtomicBool>,
@@ -18,7 +18,9 @@ impl ThreadedDeviceWrapper {
 
         let handle = Some(thread::spawn(move || {
             while alive.load(Ordering::SeqCst) {
-                device.run()
+                device.run();
+
+                sleep(Duration::from_millis(1));
             }
         }));
 

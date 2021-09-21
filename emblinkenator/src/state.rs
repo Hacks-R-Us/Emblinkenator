@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
+use crossbeam::channel::Sender;
 use parking_lot::RwLock;
 
-use crate::{
-    animation::manager::AnimationManager, pipeline::PipelineContext, world::context::WorldContext,
-};
+use crate::{animation::manager::AnimationManager, auxiliary_data::AuxiliaryDataManager, pipeline::PipelineContext, world::context::WorldContext};
 
 pub struct EmblinkenatorState {
     animation_manager: Arc<RwLock<AnimationManager>>,
+    auxiliary_data_manager: Arc<RwLock<AuxiliaryDataManager>>,
     world_context: Arc<RwLock<WorldContext>>,
-    pipeline_context_buffer: crossbeam::channel::Sender<PipelineContext>,
+    pipeline_context_subscribers: Vec<crossbeam::channel::Sender<PipelineContext>>,
 }
 
 pub trait ThreadedObject: Sync + Send {
@@ -20,35 +20,47 @@ pub trait ThreadedObject: Sync + Send {
 impl EmblinkenatorState {
     pub fn new(
         animation_manager: Arc<RwLock<AnimationManager>>,
+        auxiliary_data_manager: Arc<RwLock<AuxiliaryDataManager>>,
         world_context: Arc<RwLock<WorldContext>>,
-        pipeline_context_buffer: crossbeam::channel::Sender<PipelineContext>,
     ) -> EmblinkenatorState {
         EmblinkenatorState {
             animation_manager,
+            auxiliary_data_manager,
             world_context,
-            pipeline_context_buffer,
+            pipeline_context_subscribers: vec![],
         }
+    }
+
+    pub fn send_pipeline_context_to(&mut self, pipeline_context_buffer: Sender<PipelineContext>) {
+        self.pipeline_context_subscribers.push(pipeline_context_buffer);
     }
 }
 
 impl ThreadedObject for EmblinkenatorState {
     fn run(&mut self) {
-        if self.pipeline_context_buffer.is_full() {
-            return;
-        }
+        for pipeline_context_buffer in &self.pipeline_context_subscribers {
+            if pipeline_context_buffer.is_full() {
+                continue;
+            }
+    
+            let mut pipeline_context = PipelineContext::new();
+            {
+                let world_context = self.world_context.read().get_world_context_state();
+                pipeline_context.led_positions = world_context.led_positions;
+                pipeline_context.num_leds = world_context.num_leds;
+            }
+    
+            {
+                let animations = self.animation_manager.read().get_animation_states();
+                pipeline_context.animations = animations;
+            }
 
-        let mut pipeline_context = PipelineContext::new();
-        {
-            let world_context = self.world_context.read().get_world_context_state();
-            pipeline_context.led_positions = world_context.led_positions;
-            pipeline_context.num_leds = world_context.num_leds;
+            {
+                let auxiliary_data = self.auxiliary_data_manager.read().get_auxiliary_data();
+                pipeline_context.auxiliary_data = auxiliary_data;
+            }
+    
+            pipeline_context_buffer.send(pipeline_context).unwrap();
         }
-
-        {
-            let animations = self.animation_manager.read().get_animation_states();
-            pipeline_context.animations = animations;
-        }
-
-        self.pipeline_context_buffer.send(pipeline_context).unwrap();
     }
 }
