@@ -62,10 +62,32 @@ impl ThreadedDevice for UDPSender {
                 TryRecvError::Closed => error!("Data buffer exists but is closed! (UDP Device {})", self.id.unprotect()),
                 TryRecvError::Empty => {}
             },
-            Ok(frame) => {
-                let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
-                self.socket.send_to(&payload, &self.address).ok();
+            Ok(msg) => {
+                match msg {
+                    DeviceInput::LEDData(frame) => {
+                        let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
+                        self.socket.send_to(&payload, &self.address).ok();
+                    },
+                    DeviceInput::FrameData(_) => error!("UDPSender {} has received FrameData and doesn't know what to do with it!", self.id),
+                    DeviceInput::NextFrameData(_) => error!("UDPSender {} has received NextFrameData and doesn't know what to do with it!", self.id),
+                }
             }
         }
+    }
+
+    fn get_inputs (&self) -> Vec<crate::devices::manager::DeviceInputType> {
+        todo!()
+    }
+
+    fn get_outputs (&self) -> Vec<crate::devices::manager::DeviceOutputType> {
+        todo!()
+    }
+
+    fn send_to_input (&self, index: usize) -> Result<Sender<DeviceInput>, crate::devices::threaded_device::ThreadedDeviceInputError> {
+        todo!()
+    }
+
+    fn receive_output (&self, index: usize) -> Result<Receiver<crate::devices::manager::DeviceOutput>, crate::devices::threaded_device::ThreadedDeviceOutputError> {
+        todo!()
     }
 }

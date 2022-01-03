@@ -1,14 +1,18 @@
 use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::{self, JoinHandle, sleep}, time::Duration};
 
+use enum_dispatch::enum_dispatch;
 use tokio::sync::broadcast::{Receiver, Sender};
 
-use super::manager::{DeviceInput, DeviceInputType, DeviceOutput, DeviceOutputType};
+use super::manager::{DeviceInput, DeviceInputType, DeviceOutput, DeviceOutputType, DeviceType, LEDDataOutputDeviceType, AuxiliaryDataDeviceType};
+use super::led_output::{mqtt::MQTTSender, udp::UDPSender};
+use super::auxiliary_data::noise::NoiseAuxiliaryDataDevice;
 
 pub struct ThreadedDeviceWrapper {
     running: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
 }
 
+#[enum_dispatch]
 pub trait ThreadedDevice: Send {
     fn run (&mut self);
     fn get_inputs (&self) -> Vec<DeviceInputType>;

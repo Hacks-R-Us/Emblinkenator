@@ -1,3 +1,4 @@
+use enum_dispatch::enum_dispatch;
 use log::{debug, error};
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -15,8 +16,8 @@ use crate::{
 };
 
 use super::{
-    auxiliary_data::{noise::NoiseAuxiliaryConfig, AuxiliaryDataDevice},
-    led_output::{mqtt::MQTTSenderConfig, udp::UDPSenderConfig},
+    auxiliary_data::{noise::{NoiseAuxiliaryConfig, NoiseAuxiliaryDataDevice}, AuxiliaryDataDevice},
+    led_output::{mqtt::{MQTTSenderConfig, MQTTSender}, udp::{UDPSenderConfig, UDPSender}},
     threaded_device::{self, ThreadedDeviceWrapper},
 };
 
@@ -26,6 +27,23 @@ pub struct DeviceManager {
     subscribed_events: SubscribedEvents,
     event_emitters: RwLock<Vec<crossbeam::channel::Sender<DeviceManagerEvent>>>,
     fixture_to_device: HashMap<FixtureId, DeviceId>,
+}
+
+#[enum_dispatch(ThreadedDevice)]
+pub enum DeviceType {
+    LEDDataOutput(LEDDataOutputDeviceType),
+    Auxiliary(AuxiliaryDataDeviceType)
+}
+
+#[enum_dispatch(ThreadedDevice)]
+pub enum LEDDataOutputDeviceType {
+    MQTT(MQTTSender),
+    UPD(UDPSender)
+}
+
+#[enum_dispatch(ThreadedDevice)]
+pub enum AuxiliaryDataDeviceType {
+    Noise(NoiseAuxiliaryDataDevice)
 }
 
 #[derive(Deserialize, Clone)]
@@ -46,6 +64,10 @@ pub enum AuxiliaryDataConfigType {
     Noise(NoiseAuxiliaryConfig),
 }
 
+struct DeviceConfigWithId(DeviceId, DeviceConfigType);
+struct LEDOutputConfigWithId(DeviceId, LEDOutputConfigType);
+struct AuxiliaryDataConfigWithId(DeviceId, AuxiliaryDataConfigType);
+
 pub enum DeviceOutputType {
     Auxiliary(AuxiliaryDataTypeConsumer),
 }
@@ -58,6 +80,7 @@ pub enum DeviceOutput {
     Auxiliary(AuxiliaryDataType),
 }
 
+#[derive(Clone)]
 pub enum DeviceInput {
     LEDData(Vec<LED>),
     FrameData(FrameData),
@@ -104,13 +127,25 @@ impl DeviceManager {
         // Match type
         // Build devices
         // Link up buffers using state
+        let device: DeviceType = config.into();
+        let device = ThreadedDeviceWrapper::new(Box::new(device));
+        self.add_device(id, device)
     }
 
     pub fn get_device(&self, id: DeviceId) -> Option<Arc<ThreadedDeviceWrapper>> {
         self.devices.read().get(&id).map(|d| Arc::clone(d))
     }
 
-    pub fn add_led_device(&self, id: DeviceId, mut device: Box<dyn LEDDataOutput>) {
+    pub fn add_device(&self, id: DeviceId, device: ThreadedDeviceWrapper) {
+        let mut devices_lock = self.devices.write();
+        if devices_lock.contains_key(&id) {
+
+        }
+
+        devices_lock.insert(id, Arc::new(device));
+    }
+
+    /*pub fn add_led_device(&self, id: DeviceId, mut device: Box<dyn LEDDataOutput>) {
         let (sender, receiver) = channel(10); // TODO: Get channel size from config
         device.set_data_buffer(receiver);
 
@@ -130,7 +165,7 @@ impl DeviceManager {
             .insert(id.clone(), Arc::new(threaded_device));
 
         self.emit_device_added(id);
-    }
+    }*/
 
     pub fn remove_device(&self, _id: DeviceId) {}
 
@@ -195,6 +230,74 @@ impl ThreadedObject for DeviceManager {
             if let Some(sender) = self.led_data_buffers.read().get(device_id) {
                 sender.send(event.data).ok();
             }
+        }
+    }
+}
+
+impl From<DeviceConfigType> for DeviceType {
+    fn from(config: DeviceConfigType) -> Self {
+        let device_with_id =  DeviceConfigWithId(DeviceId::new(), config);
+        device_with_id.into()
+    }
+}
+
+impl From<DeviceConfigWithId> for DeviceType {
+    fn from(device_with_id: DeviceConfigWithId) -> Self {
+        let device_id = device_with_id.0;
+        let config = device_with_id.1;
+
+        match config {
+            DeviceConfigType::LEDDataOutput(led_device_config) => {
+                let led_device_config_with_id = LEDOutputConfigWithId(device_id, led_device_config);
+                DeviceType::LEDDataOutput(led_device_config_with_id.into())
+            },
+            DeviceConfigType::Auxiliary(auxiliary_device_config) => {
+                let auxiliary_device_config_with_id = AuxiliaryDataConfigWithId(device_id, auxiliary_device_config);
+                DeviceType::Auxiliary(auxiliary_device_config_with_id.into())
+            },
+        }
+    }
+}
+
+impl From<LEDOutputConfigType> for LEDDataOutputDeviceType {
+    fn from(led_device_config: LEDOutputConfigType) -> Self {
+        let led_device_config_with_id = LEDOutputConfigWithId(DeviceId::new(), led_device_config);
+        led_device_config_with_id.into()
+    }
+}
+
+impl From<LEDOutputConfigWithId> for LEDDataOutputDeviceType {
+    fn from(led_device_config_with_id: LEDOutputConfigWithId) -> Self {
+        let device_id = led_device_config_with_id.0;
+        let led_device_config = led_device_config_with_id.1;
+
+        match led_device_config {
+            LEDOutputConfigType::MQTT(mqtt_device_config) => {
+                LEDDataOutputDeviceType::MQTT(MQTTSender::new(device_id, mqtt_device_config))
+            },
+            LEDOutputConfigType::UDP(udp_device_config) => {
+                LEDDataOutputDeviceType::UPD(UDPSender::new(device_id, udp_device_config))
+            },
+        }
+    }
+}
+
+impl From<AuxiliaryDataConfigType> for AuxiliaryDataDeviceType {
+    fn from(auxiliary_device_config: AuxiliaryDataConfigType) -> Self {
+        let auxiliary_device_with_id = AuxiliaryDataConfigWithId(DeviceId::new(), auxiliary_device_config);
+        auxiliary_device_with_id.into()
+    }
+}
+
+impl From<AuxiliaryDataConfigWithId> for AuxiliaryDataDeviceType {
+    fn from(auxiliary_device_config_with_id: AuxiliaryDataConfigWithId) -> Self {
+        let device_id = auxiliary_device_config_with_id.0;
+        let auxiliary_device_config = auxiliary_device_config_with_id.1;
+
+        match auxiliary_device_config {
+            AuxiliaryDataConfigType::Noise(noise_auxiliary_config) => {
+                AuxiliaryDataDeviceType::Noise(NoiseAuxiliaryDataDevice::new(device_id, noise_auxiliary_config))
+            },
         }
     }
 }

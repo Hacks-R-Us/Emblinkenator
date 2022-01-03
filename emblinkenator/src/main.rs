@@ -98,6 +98,7 @@ async fn main() {
     let mut state = EmblinkenatorState::new(
         Arc::clone(&animation_manager),
         Arc::clone(&auxiliary_manager),
+        Arc::clone(&frame_time_keeper),
         Arc::clone(&world_context),
     );
     state.send_pipeline_context_to(pipeline_context_buffer_sender);
@@ -113,7 +114,7 @@ async fn main() {
 
     // Temp, setup stuff from config
     {
-        let startup_config_json = fs::read_to_string("startup_config.json").expect("Unable to read startup config file");
+        /*let startup_config_json = fs::read_to_string("startup_config.json").expect("Unable to read startup config file");
         let startup_config: StartupConfig = serde_json::from_str(&startup_config_json).unwrap();
         for fixture in startup_config.fixtures {
             let mut positions = match fixture.led_positions {
@@ -172,7 +173,7 @@ async fn main() {
 
         for mapping in startup_config.fixtures_to_device {
             device_manager.write().set_fixture_to_device(FixtureId::new_from(mapping.0), DeviceId::new_from(mapping.1));
-        }
+        }*/
     }
 
     let mut event_loop = GPUEventLoop::new(

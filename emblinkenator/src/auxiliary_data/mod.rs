@@ -123,7 +123,7 @@ impl ThreadedObject for AuxiliaryDataManager {
                         if let Some(device) =
                             self.device_manager.read().get_device(device_id.clone())
                         {
-                            match device {}
+                            todo!()
                         }
                         let aux_id = AuxiliaryId::new();
                         self.auxiliary_to_device

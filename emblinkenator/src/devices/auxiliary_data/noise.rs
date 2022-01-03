@@ -115,4 +115,20 @@ impl ThreadedDevice for NoiseAuxiliaryDataDevice {
             data_output_buffer.send(data).ok();
         }
     }
+
+    fn get_inputs (&self) -> Vec<crate::devices::manager::DeviceInputType> {
+        todo!()
+    }
+
+    fn get_outputs (&self) -> Vec<crate::devices::manager::DeviceOutputType> {
+        todo!()
+    }
+
+    fn send_to_input (&self, index: usize) -> Result<tokio::sync::broadcast::Sender<crate::devices::manager::DeviceInput>, crate::devices::threaded_device::ThreadedDeviceInputError> {
+        todo!()
+    }
+
+    fn receive_output (&self, index: usize) -> Result<tokio::sync::broadcast::Receiver<crate::devices::manager::DeviceOutput>, crate::devices::threaded_device::ThreadedDeviceOutputError> {
+        todo!()
+    }
 }

@@ -79,15 +79,21 @@ impl ThreadedDevice for MQTTSender {
                 TryRecvError::Closed => error!("Data buffer exists but is closed! (MQTT Device {})", self.id.unprotect()),
                 TryRecvError::Empty => {}
             },
-            Ok(frame) => {
-                let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
-                pollster::block_on(self.client.publish(
-                    self.topic.clone(),
-                    QoS::ExactlyOnce,
-                    true,
-                    payload,
-                ))
-                .unwrap(); // TODO: This will panic and generally do bad things
+            Ok(msg) => {
+                match msg {
+                    DeviceInput::LEDData(frame) => {
+                        let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
+                        pollster::block_on(self.client.publish(
+                            self.topic.clone(),
+                            QoS::ExactlyOnce,
+                            true,
+                            payload,
+                        ))
+                        .unwrap(); // TODO: This will panic and generally do bad things
+                    },
+                    DeviceInput::FrameData(_) => error!("MQTTSender {} has received FrameData and doesn't know what to do with it!", self.id),
+                    DeviceInput::NextFrameData(_) => error!("MQTTSender {} has received NextFrameData and doesn't know what to do with it!", self.id),
+                }
             }
         }
     }
