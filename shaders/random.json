@@ -2,6 +2,6 @@
     "id": "random",
     "shader": "random.wgsl",
     "auxiliaries": [
-        "F32Vec2"
+        "F32Vec3"
     ]
 }

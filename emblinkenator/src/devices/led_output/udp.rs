@@ -1,12 +1,10 @@
 
 use log::{error, warn};
 use serde::Deserialize;
-use tokio::sync::broadcast::{Receiver, error::TryRecvError};
+use tokio::sync::broadcast::{Receiver, Sender, channel, error::TryRecvError};
 use std::net::UdpSocket;
 
-use crate::{devices::threaded_device::ThreadedDevice, id::DeviceId, led::LED};
-
-use super::LEDDataOutput;
+use crate::{devices::{manager::DeviceInput, threaded_device::ThreadedDevice}, id::DeviceId};
 
 #[derive(Clone, Deserialize)]
 pub struct UDPSenderConfig {
@@ -35,41 +33,38 @@ pub struct UDPSender {
     name: String,
     socket: UdpSocket,
     address: String,
-    data_buffer: Option<Receiver<Vec<LED>>>
+    data_buffer_sender: Sender<DeviceInput>,
+    data_buffer_receiver: Receiver<DeviceInput>
 }
 
 impl UDPSender {
     pub fn new(id: DeviceId, config: UDPSenderConfig) -> UDPSender {
         let socket = UdpSocket::bind("0.0.0.0:0").unwrap(); // TODO: Panics!
+
+        let (sender, receiver) = channel(1);
+
         UDPSender {
             id,
             name: config.name,
             socket,
             address: format!("{}:{}", config.host, config.port),
-            data_buffer: None
+            data_buffer_sender: sender,
+            data_buffer_receiver: receiver
         }
-    }
-}
-
-impl LEDDataOutput for UDPSender {
-    fn set_data_buffer(&mut self, receiver: Receiver<Vec<LED>>) {
-        self.data_buffer.replace(receiver);
     }
 }
 
 impl ThreadedDevice for UDPSender {
     fn run(&mut self) {
-        if let Some(buffer) = &mut self.data_buffer {
-            match buffer.try_recv() {
-                Err(err) => match err {
-                    TryRecvError::Lagged(missed) => warn!("UDP device lagged by {} frames! (UDP Device {})", missed, self.id.unprotect()),
-                    TryRecvError::Closed => error!("Data buffer exists but is closed! (UDP Device {})", self.id.unprotect()),
-                    TryRecvError::Empty => {}
-                },
-                Ok(frame) => {
-                    let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
-                    self.socket.send_to(&payload, &self.address).ok();
-                }
+        match self.data_buffer_receiver.try_recv() {
+            Err(err) => match err {
+                TryRecvError::Lagged(missed) => warn!("UDP device lagged by {} frames! (UDP Device {})", missed, self.id.unprotect()),
+                TryRecvError::Closed => error!("Data buffer exists but is closed! (UDP Device {})", self.id.unprotect()),
+                TryRecvError::Empty => {}
+            },
+            Ok(frame) => {
+                let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
+                self.socket.send_to(&payload, &self.address).ok();
             }
         }
     }

@@ -80,6 +80,15 @@ impl EmblinkenatorComputeDevice {
         })
     }
 
+    pub fn create_auxiliary_data_buffer_dest(&self, id: String, size: u64) -> wgpu::Buffer {
+        self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(format!("Aux Data Buffer Dest: {}", id).as_str()),
+            size,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        })
+    }
+
     pub fn create_positions_buffer_src(&self, id: String, positions: &[f32]) -> wgpu::Buffer {
         self.device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -128,11 +137,12 @@ impl EmblinkenatorComputeDevice {
         _id: String,
         compute_bind_group_layout: &wgpu::BindGroupLayout,
         result_bind_group_layout: &wgpu::BindGroupLayout,
+        auxiliary_bind_group_layout: &wgpu::BindGroupLayout
     ) -> wgpu::PipelineLayout {
         self.device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("compute"),
-                bind_group_layouts: &[compute_bind_group_layout, result_bind_group_layout],
+                bind_group_layouts: &[compute_bind_group_layout, result_bind_group_layout, auxiliary_bind_group_layout],
                 push_constant_ranges: &[],
             })
     }

@@ -21,7 +21,7 @@ use parking_lot::RwLock;
 use pipeline::build_pipeline;
 use state::ThreadedObject;
 
-use crate::{animation::{manager::AnimationManager, AnimationTargetType}, auxiliary_data::AuxiliaryDataManager, frame::FrameTimeKeeper};
+use crate::{animation::{manager::AnimationManager, AnimationTargetType}, auxiliary_data::AuxiliaryDataManager, devices::{auxiliary_data::noise::NoiseAuxiliaryDataDevice, manager::AuxiliaryDataConfigType}, frame::FrameTimeKeeper};
 use crate::config::{EmblinkenatorConfig, StartupAnimationTargetType, StartupConfig};
 use crate::devices::{manager::{DeviceConfigType, LEDOutputConfigType}, led_output::{mqtt::MQTTSender, udp::UDPSender}};
 use crate::id::{DeviceId, FixtureId, GroupId, InstallationId};
@@ -74,7 +74,7 @@ async fn main() {
     let world_context_collection = WorldContextCollection::new();
 
     // Applies backpressure to move to next frame in time
-    let frame_time_keeper = FrameTimeKeeper::new(frame_rate);
+    let frame_time_keeper = FrameTimeKeeper::new(frame_rate, u128::from(emblinkenator_config.frame_buffer_size));
     frame_time_keeper.send_frame_data_to(event_loop_frame_data_buffer_sender);
 
     // Create state objects
@@ -85,14 +85,13 @@ async fn main() {
         Arc::clone(&world_context),
         frame_resolver_buffer_reciever,
     );
-    let device_manager = DeviceManager::new();
-    let auxiliary_manager = AuxiliaryDataManager::new();
+    let device_manager = Arc::new(RwLock::new(DeviceManager::new()));
+    let auxiliary_manager = AuxiliaryDataManager::new(Arc::clone(&device_manager));
     let pipeline = build_pipeline(leds_per_compute_group).await;
 
     // Put objects behind RwLock if they're not already
     let frame_time_keeper = Arc::new(RwLock::new(frame_time_keeper));
     let frame_resolver = Arc::new(RwLock::new(frame_resolver));
-    let device_manager = Arc::new(RwLock::new(device_manager));
     let auxiliary_manager = Arc::new(RwLock::new(auxiliary_manager));
 
     // State manager
@@ -162,6 +161,12 @@ async fn main() {
                             );
                         }
                 }
+                DeviceConfigType::Auxiliary(aux) => match aux {
+                    AuxiliaryDataConfigType::Noise(config) => {
+                        let noise_aux = NoiseAuxiliaryDataDevice::new(DeviceId::new_from(startup_device.id.clone()), config);
+                        device_manager.write().add_auxiliary_device(DeviceId::new_from(startup_device.id.clone()), Box::new(noise_aux));
+                    },
+                },
             };
         }
 

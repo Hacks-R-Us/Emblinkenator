@@ -15,14 +15,16 @@ pub struct EmblinkenatorConfig {
 // Temporary solution for adding some devices before a UI comes into existence
 #[derive(Deserialize)]
 pub struct StartupConfig {
-    pub fixtures: Vec<StartupFixtures>,
+    pub fixtures: Vec<StartupFixture>,
     pub animations: Vec<StartupAnimations>,
-    pub devices: Vec<StartupDevices>,
-    pub fixtures_to_device: HashMap<String, String>
+    pub devices: Vec<StartupDevice>,
+    pub fixtures_to_device: HashMap<String, String>,
+    // AnimationId -> [DeviceId]
+    pub animation_auxiliary_sources: HashMap<String, Vec<String>>
 }
 
 #[derive(Deserialize)]
-pub struct StartupFixtures {
+pub struct StartupFixture {
     pub id: String,
     pub num_leds: u32,
     pub led_positions: Option<Vec<Coord>>
@@ -35,7 +37,7 @@ pub struct StartupAnimations {
 }
 
 #[derive(Deserialize)]
-pub struct StartupDevices {
+pub struct StartupDevice {
     pub id: String,
     pub config: DeviceConfigType
 }

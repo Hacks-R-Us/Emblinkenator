@@ -1,11 +1,9 @@
 use log::{error, warn};
 use rumqttc::{AsyncClient, MqttOptions, QoS};
-use tokio::{sync::broadcast::{Receiver, error::TryRecvError}, task};
+use tokio::{sync::broadcast::{Receiver, Sender, channel, error::TryRecvError}, task};
 use serde::Deserialize;
 
-use crate::{devices::threaded_device::ThreadedDevice, id::DeviceId, led::LED};
-
-use super::LEDDataOutput;
+use crate::{devices::{manager::{DeviceInput, DeviceInputType, DeviceOutput, DeviceOutputType}, threaded_device::{ThreadedDevice, ThreadedDeviceInputError, ThreadedDeviceOutputError}}, id::DeviceId};
 
 #[derive(Clone, Deserialize)]
 pub struct MQTTSenderConfig {
@@ -39,7 +37,8 @@ pub struct MQTTSender {
     name: String,
     client: AsyncClient,
     topic: String,
-    data_buffer: Option<Receiver<Vec<LED>>>
+    data_buffer_sender: Sender<DeviceInput>,
+    data_buffer_receiver: Receiver<DeviceInput>
 }
 
 impl MQTTSender {
@@ -59,42 +58,53 @@ impl MQTTSender {
             }
         });
 
+        let (sender, receiver) = channel(1);
+
         MQTTSender {
             id,
             name: config.name,
             client,
             topic: config.topic,
-            data_buffer: None
+            data_buffer_sender: sender,
+            data_buffer_receiver: receiver
         }
-    }
-}
-
-impl LEDDataOutput for MQTTSender {
-    fn set_data_buffer(&mut self, receiver: Receiver<Vec<LED>>) {
-        self.data_buffer.replace(receiver);
     }
 }
 
 impl ThreadedDevice for MQTTSender {
     fn run(&mut self) {
-        if let Some(buffer) = &mut self.data_buffer {
-            match buffer.try_recv() {
-                Err(err) => match err {
-                    TryRecvError::Lagged(missed) => warn!("MQTT device lagged by {} frames! (MQTT Device {})", missed, self.id.unprotect()),
-                    TryRecvError::Closed => error!("Data buffer exists but is closed! (MQTT Device {})", self.id.unprotect()),
-                    TryRecvError::Empty => {}
-                },
-                Ok(frame) => {
-                    let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
-                    pollster::block_on(self.client.publish(
-                        self.topic.clone(),
-                        QoS::ExactlyOnce,
-                        true,
-                        payload,
-                    ))
-                    .unwrap(); // TODO: This will panic and generally do bad things
-                }
+        match self.data_buffer_receiver.try_recv() {
+            Err(err) => match err {
+                TryRecvError::Lagged(missed) => warn!("MQTT device lagged by {} frames! (MQTT Device {})", missed, self.id.unprotect()),
+                TryRecvError::Closed => error!("Data buffer exists but is closed! (MQTT Device {})", self.id.unprotect()),
+                TryRecvError::Empty => {}
+            },
+            Ok(frame) => {
+                let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
+                pollster::block_on(self.client.publish(
+                    self.topic.clone(),
+                    QoS::ExactlyOnce,
+                    true,
+                    payload,
+                ))
+                .unwrap(); // TODO: This will panic and generally do bad things
             }
         }
+    }
+
+    fn get_inputs (&self) -> Vec<DeviceInputType> {
+        vec![DeviceInputType::LEDData]
+    }
+
+    fn get_outputs (&self) -> Vec<DeviceOutputType> {
+        vec![]
+    }
+
+    fn send_to_input (&self, index: usize) -> Result<Sender<DeviceInput>, ThreadedDeviceInputError> {
+        Ok(self.data_buffer_sender.clone())
+    }
+
+    fn receive_output (&self, index: usize) -> Result<Receiver<DeviceOutput>, ThreadedDeviceOutputError> {
+        Err(ThreadedDeviceOutputError::DoesNotExist)
     }
 }

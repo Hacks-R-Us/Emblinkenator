@@ -1,5 +1,9 @@
 use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::{self, JoinHandle, sleep}, time::Duration};
 
+use tokio::sync::broadcast::{Receiver, Sender};
+
+use super::manager::{DeviceInput, DeviceInputType, DeviceOutput, DeviceOutputType};
+
 pub struct ThreadedDeviceWrapper {
     running: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
@@ -7,6 +11,21 @@ pub struct ThreadedDeviceWrapper {
 
 pub trait ThreadedDevice: Send {
     fn run (&mut self);
+    fn get_inputs (&self) -> Vec<DeviceInputType>;
+    fn get_outputs (&self) -> Vec<DeviceOutputType>;
+    fn send_to_input (&self, index: usize) -> Result<Sender<DeviceInput>, ThreadedDeviceInputError>;
+    fn receive_output (&self, index: usize) -> Result<Receiver<DeviceOutput>, ThreadedDeviceOutputError>;
+}
+
+pub enum ThreadedDeviceInputError {
+    DoesNotExist,
+    WrongDataType,
+    OverSubscribed
+}
+
+pub enum ThreadedDeviceOutputError {
+    DoesNotExist,
+    OverSubscribed
 }
 
 impl ThreadedDeviceWrapper {

@@ -1,5 +1,5 @@
 use crossbeam::channel::Sender;
-use log::warn;
+use log::{debug, warn};
 use parking_lot::RwLock;
 use tokio::time::{self, Instant, Interval};
 
@@ -13,7 +13,7 @@ pub struct FrameData {
 
 struct FrameStats {
     pub frame_start_time: Instant,
-    pub target_frame_time: u64,
+    pub target_frame_time: u128,
 }
 
 pub struct FrameTimeKeeper {
@@ -23,11 +23,13 @@ pub struct FrameTimeKeeper {
     clock_frame: Interval,
     frame_data: FrameData,
     next_frame_data: FrameData,
-    frame_stats: FrameStats
+    frame_stats: FrameStats,
+    late_time: u128,
+    frame_buffer_size: u128
 }
 
 impl FrameTimeKeeper {
-    pub fn new (frame_rate: u32) -> Self {
+    pub fn new (frame_rate: u32, frame_buffer_size: u128) -> Self {
         // TODO: Dodgy!
         let frame_time: u64 = u64::from(1000 / frame_rate);
         let clock_frame = time::interval(time::Duration::from_millis(frame_time));
@@ -39,7 +41,9 @@ impl FrameTimeKeeper {
             clock_frame,
             frame_data: FrameData::new(0, frame_rate),
             next_frame_data: FrameData::new(1, frame_rate),
-            frame_stats: FrameStats::new(frame_time)
+            frame_stats: FrameStats::new(u128::from(frame_time)),
+            frame_buffer_size,
+            late_time: 0
         }
     }
 
@@ -62,13 +66,23 @@ impl ThreadedObject for FrameTimeKeeper {
                 .duration_since(last_frame_start)
                 .as_millis();
 
-            if elapsed_time > u128::from(target_frame_time) {
-                warn!(
-                    "Running late by {}ms (Took {}ms)",
-                    elapsed_time - u128::from(target_frame_time),
-                    elapsed_time
-                );
+        if elapsed_time > target_frame_time {
+            self.late_time += elapsed_time - target_frame_time;
+            debug!(
+                "Frame late by {}ms (Took {}ms)",
+                elapsed_time - target_frame_time,
+                elapsed_time
+            );
+        } else if self.late_time > 0 {
+            match self.late_time.checked_sub(target_frame_time - elapsed_time) {
+                Some(val) => self.late_time = val,
+                None => self.late_time = 0
             }
+        }
+
+        if self.late_time >= target_frame_time * self.frame_buffer_size {
+            warn!("Running late by {}ms", self.late_time);
+        }
 
         // TODO: This is where a change to framerate would happen
         self.frame_data = self.next_frame_data.clone();
@@ -96,7 +110,7 @@ impl FrameData {
 }
 
 impl FrameStats {
-    pub fn new (target_frame_time: u64) -> Self {
+    pub fn new (target_frame_time: u128) -> Self {
         FrameStats {
             frame_start_time: Instant::now(),
             target_frame_time

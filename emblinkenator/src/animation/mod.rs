@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    id::{AnimationId, FixtureId, GroupId, InstallationId},
-    world::{context::WorldContext, Coord},
-};
+use crate::{auxiliary_data::AuxiliaryDataTypeConsumer, id::{AnimationId, FixtureId, GroupId, InstallationId}, world::{context::WorldContext, Coord}};
 
 use self::factory::AnimationManifest;
 
@@ -53,6 +50,10 @@ impl Animation {
 
     pub fn get_target_type(&self) -> AnimationTargetType {
         self.target.clone()
+    }
+
+    pub fn get_auxiliaries(&self) -> Option<Vec<AuxiliaryDataTypeConsumer>> {
+        self.manifest.auxiliaries.clone()
     }
 }
 

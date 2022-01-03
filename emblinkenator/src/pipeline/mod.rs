@@ -2,8 +2,9 @@ mod compute_device;
 
 use std::{collections::HashMap, convert::TryInto, mem, u64};
 
-use crate::{animation::{Animation, AnimationTargetType}, auxiliary_data::AuxiliaryDataType, frame::FrameData, id::{AnimationId, AuxiliaryId}, led::LED, world::Coord};
+use crate::{animation::{Animation, AnimationTargetType}, auxiliary_data::{AuxiliaryData, AuxiliaryDataTypeConsumer, aux_data_to_consumer_type}, frame::FrameData, id::{AnimationId, AuxiliaryId}, led::LED, world::Coord};
 use compute_device::{build_compute_device, EmblinkenatorComputeDevice};
+use log::warn;
 
 pub struct EmblinkenatorPipeline {
     state: EmblinkenatorPipelineState,
@@ -11,6 +12,7 @@ pub struct EmblinkenatorPipeline {
     compute_device: EmblinkenatorComputeDevice,
     frame_data_buffer: wgpu::Buffer,
     compute_shaders: Vec<PipelineEntry>,
+    auxiliary_buffers: HashMap<AuxiliaryId, PipelineAuxiliary>,
     current_context: Option<PipelineContext>,
 }
 
@@ -20,21 +22,29 @@ pub struct PipelineContext {
     pub led_positions: HashMap<String, Vec<Coord>>,
     pub num_leds: HashMap<String, u32>,
     pub animations: HashMap<AnimationId, Animation>,
-    pub auxiliary_data: HashMap<AnimationId, Vec<AuxiliaryDataType>>
+    pub auxiliary_data: HashMap<AuxiliaryId, AuxiliaryData>,
+    pub animation_auxiliary_data: HashMap<AnimationId, Vec<AuxiliaryId>>,
 }
 
 struct PipelineEntry {
-    id: String,
+    id: AnimationId,
     target_id: String,
     storage_buffer: wgpu::Buffer,
     staging_buffer: wgpu::Buffer,
     compute_pipeline: wgpu::ComputePipeline,
     compute_bind_group: wgpu::BindGroup,
     result_bind_group: wgpu::BindGroup,
+    auxiliary_bind_group_layout: wgpu::BindGroupLayout,
+    auxiliary_types: Vec<AuxiliaryDataTypeConsumer>,
     positions_data_buffer: wgpu::Buffer,
     num_leds: u32,
     result_size: u64,
     work_group_count: u32,
+}
+
+struct PipelineAuxiliary {
+    buffer: wgpu::Buffer,
+    aux_type: AuxiliaryDataTypeConsumer
 }
 
 #[derive(Clone, Debug)]
@@ -67,7 +77,8 @@ impl PipelineContext {
             num_leds: HashMap::new(),
             led_positions: HashMap::new(),
             animations: HashMap::new(),
-            auxiliary_data: HashMap::new()
+            auxiliary_data: HashMap::new(),
+            animation_auxiliary_data: HashMap::new()
         }
     }
 }
@@ -86,6 +97,7 @@ impl EmblinkenatorPipeline {
             compute_device,
             frame_data_buffer,
             compute_shaders: vec![],
+            auxiliary_buffers: HashMap::new(),
             current_context: None,
         }
     }
@@ -102,11 +114,26 @@ impl EmblinkenatorPipeline {
 
         let prev_state = self.current_context.replace(context.clone());
         let mut added_animations: Vec<(AnimationId, Animation)> = vec![];
+        let mut added_auxiliaries: Vec<(AuxiliaryId, AuxiliaryData)> = vec![];
         if let Some(prev_state) = prev_state {
+            for auxiliary in context.auxiliary_data.iter() {
+                if !prev_state.auxiliary_data.contains_key(auxiliary.0) {
+                    // New auxiliary
+                    added_auxiliaries.push((auxiliary.0.clone(), auxiliary.1.clone()));
+                }
+            }
+
             for animation in context.animations.iter() {
                 if !prev_state.animations.contains_key(animation.0) {
                     // New animation
                     added_animations.push((animation.0.clone(), animation.1.clone()));
+                }
+            }
+
+            for auxiliary in prev_state.auxiliary_data.iter() {
+                if !context.auxiliary_data.contains_key(auxiliary.0) {
+                    // Removed auxiliary
+                    // TODO
                 }
             }
 
@@ -117,11 +144,25 @@ impl EmblinkenatorPipeline {
                 }
             }
         } else {
+            added_auxiliaries = context
+                .auxiliary_data
+                .iter()
+                .map(|auxiliary| (auxiliary.0.clone(), auxiliary.1.clone()))
+                .collect();
+
             added_animations = context
                 .animations
                 .iter()
                 .map(|animation| (animation.0.clone(), animation.1.clone()))
                 .collect();
+        }
+
+        if !added_auxiliaries.is_empty() {
+            for auxiliary in added_auxiliaries.into_iter() {
+                // TODO: Better error handling, should bundle errors
+                self.add_auxiliary(auxiliary.0, auxiliary.1)?;
+            }
+            self.load_shaders_to_gpu();
         }
 
         if !added_animations.is_empty() {
@@ -181,6 +222,26 @@ impl EmblinkenatorPipeline {
         let positions_data_buffer = self
             .compute_device
             .create_positions_buffer_dest(id.unprotect(), num_leds);
+
+        let auxiliaries = animation.get_auxiliaries();
+        let mut auxiliary_bind_group_entries: Vec<wgpu::BindGroupLayoutEntry> = vec![];
+
+        if let Some(auxiliaries) = auxiliaries {
+            for _ in auxiliaries.iter() {
+                auxiliary_bind_group_entries.push(
+                    wgpu::BindGroupLayoutEntry {
+                        binding: auxiliary_bind_group_entries.len() as u32,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None
+                        },
+                        count: None,
+                    }
+                );
+            }
+        }
 
         let compute_bind_group_entries: Vec<wgpu::BindGroupLayoutEntry> = vec![
             // Frame Info
@@ -247,6 +308,10 @@ impl EmblinkenatorPipeline {
             format!("Compute bind group layout: {}", id.unprotect()).as_str(),
             &compute_bind_group_entries,
         );
+        let auxiliary_bind_group_layout = self.compute_device.create_bind_group_layout(
+            format!("Auxiliary bund group layout: {}", id.unprotect()).as_str(),
+            &auxiliary_bind_group_entries
+        );
         let result_bind_group = self.compute_device.create_bind_group(
             format!("Result bind group: {}", id.unprotect()).as_str(),
             &result_bind_group_layout,
@@ -261,6 +326,7 @@ impl EmblinkenatorPipeline {
             id.unprotect(),
             &compute_bind_group_layout,
             &result_bind_group_layout,
+            &auxiliary_bind_group_layout
         );
         let compute_pipeline = self.compute_device.create_shader_compute_pipeline(
             id.unprotect(),
@@ -269,18 +335,38 @@ impl EmblinkenatorPipeline {
         );
 
         self.compute_shaders.push(PipelineEntry {
-            id: id.unprotect(),
+            id,
             target_id,
             storage_buffer,
             staging_buffer,
             compute_pipeline,
             compute_bind_group,
             result_bind_group,
+            auxiliary_bind_group_layout,
             positions_data_buffer,
             num_leds,
             work_group_count,
             result_size,
+            auxiliary_types: animation.get_auxiliaries().unwrap_or_default()
         });
+
+        Ok(())
+    }
+
+    pub fn add_auxiliary (&mut self,
+        id: AuxiliaryId,
+        auxiliary: AuxiliaryData
+    ) -> Result<(), EmblinkenatorPipelineError> {
+
+        let auxiliary_buffer = self
+            .compute_device
+            .create_auxiliary_data_buffer_dest(id.unprotect(), auxiliary.size);
+        let auxiliary = PipelineAuxiliary {
+            buffer: auxiliary_buffer,
+            aux_type: aux_data_to_consumer_type(auxiliary.data)
+        };
+
+        self.auxiliary_buffers.insert(id, auxiliary);
 
         Ok(())
     }
@@ -332,6 +418,46 @@ impl EmblinkenatorPipeline {
                 continue;
             }
 
+            let mut auxiliary_group_entries: Vec<wgpu::BindGroupEntry> = vec![];
+
+            if let Some(auxiliaries) = context.animation_auxiliary_data.get(&shader.id) {
+                let mut missing_auxiliaries: Vec<AuxiliaryId> = vec![];
+                for (index, auxiliary_id) in auxiliaries.iter().enumerate() {
+                    let aux = self.auxiliary_buffers.get(auxiliary_id);
+                    if aux.is_none() {
+                        missing_auxiliaries.push(auxiliary_id.clone());
+                        continue;
+                    }
+                    let aux = aux.unwrap();
+
+                    if let Some(aux_type) = shader.auxiliary_types.get(index) {
+                        if *aux_type != aux.aux_type {
+                            missing_auxiliaries.push(auxiliary_id.clone());
+                            continue;
+                        }
+                    }
+
+                    auxiliary_group_entries.push(
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: aux.buffer.as_entire_binding(),
+                        }
+                    )
+                }
+
+                if !missing_auxiliaries.is_empty() {
+                    let missing_auxiliaries_str: Vec<String> = missing_auxiliaries.iter().map(|aux_id|aux_id.unprotect()).collect();
+                    warn!("Shader {} is missing {} auxiliaries ({}). Not computing frame data", shader.id.unprotect(), missing_auxiliaries.len(), missing_auxiliaries_str.join(","));
+                    continue;
+                }
+            }
+
+            let auxiliaries_bind_group = self.compute_device.create_bind_group(
+                format!("Auxiliary bind group: {}", shader.id.unprotect()).as_str(),
+                &shader.auxiliary_bind_group_layout,
+                &auxiliary_group_entries,
+            );
+
             let led_positions_flat: Vec<f32> = led_positions
                 .unwrap()
                 .iter()
@@ -339,7 +465,7 @@ impl EmblinkenatorPipeline {
                 .collect();
 
             let led_positions_buffer = self.compute_device.create_positions_buffer_src(
-                format!("{} {}", shader.id, frame_data.frame).to_string(),
+                format!("{} {}", shader.id.unprotect(), frame_data.frame).to_string(),
                 &led_positions_flat,
             );
             let zeros_buffer = self.compute_device.create_zeros_buffer(shader.num_leds);
@@ -361,15 +487,16 @@ impl EmblinkenatorPipeline {
             );
 
             command_encoder
-                .push_debug_group(format!("Compute pattern state {}", shader.id).as_str());
+                .push_debug_group(format!("Compute pattern state {}", shader.id.unprotect()).as_str());
             {
                 // Compute pass
                 let mut cpass = command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                    label: Some(shader.id.as_str()),
+                    label: Some(&shader.id.unprotect()),
                 });
                 cpass.set_pipeline(&shader.compute_pipeline);
                 cpass.set_bind_group(0, &shader.compute_bind_group, &[]);
                 cpass.set_bind_group(1, &shader.result_bind_group, &[]);
+                cpass.set_bind_group(2, &auxiliaries_bind_group, &[]);
                 cpass.dispatch(shader.work_group_count, 1, 1);
             }
             command_encoder.pop_debug_group();
@@ -417,11 +544,11 @@ impl EmblinkenatorPipeline {
                 let state: Vec<LED> = result.chunks(3).map(LED::from).collect();
 
                 if state.len() == shader.num_leds as usize {
-                    states.insert(shader.id.clone(), state);
+                    states.insert(shader.id.unprotect(), state);
                 } else {
                     panic!(
                         "Shader {} did not return enough LED states. Expected {} Got {}",
-                        shader.id,
+                        shader.id.unprotect(),
                         shader.num_leds,
                         state.len()
                     );
