@@ -120,7 +120,7 @@ impl ThreadedObject for AuxiliaryDataManager {
             for event in device_manager.try_iter() {
                 match event {
                     DeviceManagerEvent::DeviceAdded(device_id) => {
-                        if let Some(device) =
+                        if let Some(_device) =
                             self.device_manager.read().get_device(device_id.clone())
                         {
                             todo!()
@@ -130,7 +130,7 @@ impl ThreadedObject for AuxiliaryDataManager {
                             .write()
                             .insert(aux_id.clone(), device_id.clone());
                     }
-                    DeviceManagerEvent::DeviceRemoved(deviceId) => todo!(),
+                    DeviceManagerEvent::DeviceRemoved(_device_id) => todo!(),
                 }
             }
         }

@@ -83,11 +83,11 @@ impl ThreadedDevice for UDPSender {
         todo!()
     }
 
-    fn send_to_input (&self, index: usize) -> Result<Sender<DeviceInput>, crate::devices::threaded_device::ThreadedDeviceInputError> {
+    fn send_to_input (&self, _index: usize) -> Result<Sender<DeviceInput>, crate::devices::threaded_device::ThreadedDeviceInputError> {
         todo!()
     }
 
-    fn receive_output (&self, index: usize) -> Result<Receiver<crate::devices::manager::DeviceOutput>, crate::devices::threaded_device::ThreadedDeviceOutputError> {
+    fn receive_output (&self, _index: usize) -> Result<Receiver<crate::devices::manager::DeviceOutput>, crate::devices::threaded_device::ThreadedDeviceOutputError> {
         todo!()
     }
 }

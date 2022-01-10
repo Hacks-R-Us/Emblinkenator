@@ -21,12 +21,12 @@ use parking_lot::RwLock;
 use pipeline::build_pipeline;
 use state::ThreadedObject;
 
-use crate::{animation::{manager::AnimationManager, AnimationTargetType}, auxiliary_data::AuxiliaryDataManager, devices::{auxiliary_data::noise::NoiseAuxiliaryDataDevice, manager::AuxiliaryDataConfigType}, frame::FrameTimeKeeper};
-use crate::config::{EmblinkenatorConfig, StartupAnimationTargetType, StartupConfig};
-use crate::devices::{manager::{DeviceConfigType, LEDOutputConfigType}, led_output::{mqtt::MQTTSender, udp::UDPSender}};
-use crate::id::{DeviceId, FixtureId, GroupId, InstallationId};
+use crate::{animation::{manager::AnimationManager}, auxiliary_data::AuxiliaryDataManager, frame::FrameTimeKeeper};
+use crate::config::{EmblinkenatorConfig};
+
+
 use crate::state::EmblinkenatorState;
-use crate::world::{Coord, context::{WorldContext, WorldContextCollection}, fixture::{Fixture, FixtureProps}};
+use crate::world::{context::{WorldContext, WorldContextCollection}};
 
 #[macro_use]
 extern crate protected_id_derive;

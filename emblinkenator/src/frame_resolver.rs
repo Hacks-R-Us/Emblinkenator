@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use log::{debug, info, warn};
+use log::{debug, warn};
 use parking_lot::RwLock;
 use tokio::sync::broadcast::{self, Receiver, error::TryRecvError};
 

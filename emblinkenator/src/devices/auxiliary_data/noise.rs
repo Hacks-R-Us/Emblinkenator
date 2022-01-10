@@ -124,11 +124,11 @@ impl ThreadedDevice for NoiseAuxiliaryDataDevice {
         todo!()
     }
 
-    fn send_to_input (&self, index: usize) -> Result<tokio::sync::broadcast::Sender<crate::devices::manager::DeviceInput>, crate::devices::threaded_device::ThreadedDeviceInputError> {
+    fn send_to_input (&self, _index: usize) -> Result<tokio::sync::broadcast::Sender<crate::devices::manager::DeviceInput>, crate::devices::threaded_device::ThreadedDeviceInputError> {
         todo!()
     }
 
-    fn receive_output (&self, index: usize) -> Result<tokio::sync::broadcast::Receiver<crate::devices::manager::DeviceOutput>, crate::devices::threaded_device::ThreadedDeviceOutputError> {
+    fn receive_output (&self, _index: usize) -> Result<tokio::sync::broadcast::Receiver<crate::devices::manager::DeviceOutput>, crate::devices::threaded_device::ThreadedDeviceOutputError> {
         todo!()
     }
 }

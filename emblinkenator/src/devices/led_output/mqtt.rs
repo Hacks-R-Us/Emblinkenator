@@ -106,11 +106,11 @@ impl ThreadedDevice for MQTTSender {
         vec![]
     }
 
-    fn send_to_input (&self, index: usize) -> Result<Sender<DeviceInput>, ThreadedDeviceInputError> {
+    fn send_to_input (&self, _index: usize) -> Result<Sender<DeviceInput>, ThreadedDeviceInputError> {
         Ok(self.data_buffer_sender.clone())
     }
 
-    fn receive_output (&self, index: usize) -> Result<Receiver<DeviceOutput>, ThreadedDeviceOutputError> {
+    fn receive_output (&self, _index: usize) -> Result<Receiver<DeviceOutput>, ThreadedDeviceOutputError> {
         Err(ThreadedDeviceOutputError::DoesNotExist)
     }
 }

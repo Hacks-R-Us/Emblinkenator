@@ -4,7 +4,7 @@ use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 
 use serde::Deserialize;
-use tokio::sync::broadcast::{channel, error::TryRecvError, Receiver, Sender};
+use tokio::sync::broadcast::{error::TryRecvError, Receiver, Sender};
 
 use crate::{
     auxiliary_data::{AuxiliaryDataType, AuxiliaryDataTypeConsumer},
@@ -16,9 +16,9 @@ use crate::{
 };
 
 use super::{
-    auxiliary_data::{noise::{NoiseAuxiliaryConfig, NoiseAuxiliaryDataDevice}, AuxiliaryDataDevice},
+    auxiliary_data::{noise::{NoiseAuxiliaryConfig, NoiseAuxiliaryDataDevice}},
     led_output::{mqtt::{MQTTSenderConfig, MQTTSender}, udp::{UDPSenderConfig, UDPSender}},
-    threaded_device::{self, ThreadedDeviceWrapper},
+    threaded_device::{ThreadedDeviceWrapper},
 };
 
 pub struct DeviceManager {
@@ -122,7 +122,7 @@ impl DeviceManager {
         &mut self,
         config: DeviceConfigType,
         id: DeviceId,
-        state: &EmblinkenatorState,
+        _state: &EmblinkenatorState,
     ) {
         // Match type
         // Build devices
@@ -133,7 +133,7 @@ impl DeviceManager {
     }
 
     pub fn get_device(&self, id: DeviceId) -> Option<Arc<ThreadedDeviceWrapper>> {
-        self.devices.read().get(&id).map(|d| Arc::clone(d))
+        self.devices.read().get(&id).map(Arc::clone)
     }
 
     pub fn add_device(&self, id: DeviceId, device: ThreadedDeviceWrapper) {
