@@ -98,6 +98,7 @@ async fn main() {
     let mut state = EmblinkenatorState::new(
         Arc::clone(&animation_manager),
         Arc::clone(&auxiliary_manager),
+        Arc::clone(&device_manager),
         Arc::clone(&frame_time_keeper),
         Arc::clone(&world_context),
     );

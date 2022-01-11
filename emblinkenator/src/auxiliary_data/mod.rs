@@ -6,6 +6,7 @@ use parking_lot::RwLock;
 use tokio::sync::broadcast::Receiver;
 
 use crate::devices::manager::DeviceManagerEvent;
+use crate::state::WantsDeviceState;
 use crate::{
     devices::manager::DeviceManager,
     id::{AnimationId, AuxiliaryId, DeviceId},
@@ -134,6 +135,12 @@ impl ThreadedObject for AuxiliaryDataManager {
                 }
             }
         }
+    }
+}
+
+impl WantsDeviceState for AuxiliaryDataManager {
+    fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: DeviceId) {
+        todo!()
     }
 }
 

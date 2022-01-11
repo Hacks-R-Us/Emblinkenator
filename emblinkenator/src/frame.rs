@@ -3,7 +3,7 @@ use log::{debug, warn};
 use parking_lot::RwLock;
 use tokio::time::{self, Instant, Interval};
 
-use crate::state::ThreadedObject;
+use crate::state::{ThreadedObject, WantsDeviceState};
 
 #[derive(Clone)]
 pub struct FrameData {
@@ -97,6 +97,12 @@ impl ThreadedObject for FrameTimeKeeper {
         for sender in self.next_frame_data_senders.write().iter() {
             sender.send(self.next_frame_data.clone()).ok();
         }
+    }
+}
+
+impl WantsDeviceState for FrameTimeKeeper {
+    fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: crate::id::DeviceId) {
+        todo!()
     }
 }
 

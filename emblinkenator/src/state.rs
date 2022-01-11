@@ -5,15 +5,18 @@ use parking_lot::RwLock;
 
 use crate::{
     animation::manager::AnimationManager, auxiliary_data::AuxiliaryDataManager,
-    frame::FrameTimeKeeper, pipeline::PipelineContext, world::context::WorldContext,
+    frame::FrameTimeKeeper, pipeline::PipelineContext, world::context::WorldContext, devices::manager::{DeviceManager, DeviceManagerEvent}, id::DeviceId,
 };
 
 pub struct EmblinkenatorState {
     animation_manager: Arc<RwLock<AnimationManager>>,
     auxiliary_data_manager: Arc<RwLock<AuxiliaryDataManager>>,
+    device_manager: Arc<RwLock<DeviceManager>>,
     frame_time_keeper: Arc<RwLock<FrameTimeKeeper>>,
     world_context: Arc<RwLock<WorldContext>>,
     pipeline_context_subscribers: Vec<crossbeam::channel::Sender<PipelineContext>>,
+    wants_device_state: Vec<Arc<RwLock<dyn WantsDeviceState>>>,
+    device_manager_events: crossbeam::channel::Receiver<DeviceManagerEvent>
 }
 
 pub trait ThreadedObject: Sync + Send {
@@ -21,19 +24,28 @@ pub trait ThreadedObject: Sync + Send {
     fn run(&mut self);
 }
 
+pub trait WantsDeviceState: Sync + Send {
+    fn on_device_added(&mut self, state: &EmblinkenatorState, device_id: DeviceId);
+}
+
 impl EmblinkenatorState {
     pub fn new(
         animation_manager: Arc<RwLock<AnimationManager>>,
         auxiliary_data_manager: Arc<RwLock<AuxiliaryDataManager>>,
+        device_manager: Arc<RwLock<DeviceManager>>,
         frame_time_keeper: Arc<RwLock<FrameTimeKeeper>>,
         world_context: Arc<RwLock<WorldContext>>,
     ) -> EmblinkenatorState {
+        let device_manager_events = device_manager.write().subscribe_to_events();
         EmblinkenatorState {
-            animation_manager,
-            auxiliary_data_manager,
-            frame_time_keeper,
+            animation_manager: Arc::clone(&animation_manager),
+            auxiliary_data_manager: Arc::clone(&auxiliary_data_manager),
+            device_manager,
+            frame_time_keeper: Arc::clone(&frame_time_keeper),
             world_context,
             pipeline_context_subscribers: vec![],
+            wants_device_state: vec![animation_manager, auxiliary_data_manager, frame_time_keeper],
+            device_manager_events
         }
     }
 
@@ -76,6 +88,15 @@ impl ThreadedObject for EmblinkenatorState {
             }
 
             pipeline_context_buffer.send(pipeline_context).unwrap();
+        }
+
+        for device_manager_message in self.device_manager_events.try_recv() {
+            for device in &self.wants_device_state {
+                match &device_manager_message {
+                    DeviceManagerEvent::DeviceAdded(device_id) => device.write().on_device_added(&self, device_id.clone()),
+                    DeviceManagerEvent::DeviceRemoved(_) => todo!(),
+                }
+            }
         }
     }
 }

@@ -122,11 +122,7 @@ impl DeviceManager {
         &mut self,
         config: DeviceConfigType,
         id: DeviceId,
-        _state: &EmblinkenatorState,
     ) {
-        // Match type
-        // Build devices
-        // Link up buffers using state
         let device: DeviceType = config.into();
         let device = ThreadedDeviceWrapper::new(Box::new(device));
         self.add_device(id, device)
@@ -142,7 +138,9 @@ impl DeviceManager {
 
         }
 
-        devices_lock.insert(id, Arc::new(device));
+        devices_lock.insert(id.clone(), Arc::new(device));
+
+        self.emit_device_added(id);
     }
 
     /*pub fn add_led_device(&self, id: DeviceId, mut device: Box<dyn LEDDataOutput>) {
@@ -167,7 +165,9 @@ impl DeviceManager {
         self.emit_device_added(id);
     }*/
 
-    pub fn remove_device(&self, _id: DeviceId) {}
+    pub fn remove_device(&self, _id: DeviceId) {
+        todo!()
+    }
 
     pub fn set_fixture_to_device(&mut self, fixture_id: FixtureId, device_id: DeviceId) {
         self.fixture_to_device.insert(fixture_id, device_id);
