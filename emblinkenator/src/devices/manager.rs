@@ -1,4 +1,3 @@
-use enum_dispatch::enum_dispatch;
 use log::{debug, error};
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -10,40 +9,30 @@ use crate::{
     auxiliary_data::{AuxiliaryDataType, AuxiliaryDataTypeConsumer},
     frame::FrameData,
     frame_resolver::FrameResolverDataEvent,
-    id::{DeviceId, FixtureId},
+    id::DeviceId,
     led::LED,
-    state::{EmblinkenatorState, ThreadedObject},
+    state::{ThreadedObject},
 };
 
 use super::{
-    auxiliary_data::{noise::{NoiseAuxiliaryConfig, NoiseAuxiliaryDataDevice}},
-    led_output::{mqtt::{MQTTSenderConfig, MQTTSender}, udp::{UDPSenderConfig, UDPSender}},
-    threaded_device::{ThreadedDeviceWrapper},
+    auxiliary_data::{noise::{NoiseAuxiliaryConfig, NoiseAuxiliaryDataDevice}, AuxiliaryDataDeviceType, ThreadedAuxiliaryDeviceWrapper},
+    led_output::{mqtt::{MQTTSenderConfig, MQTTSender}, udp::{UDPSenderConfig, UDPSender}, LEDDataOutputDeviceType, ThreadedLEDOutputDeviceWrapper},
 };
 
 pub struct DeviceManager {
-    devices: RwLock<HashMap<DeviceId, Arc<ThreadedDeviceWrapper>>>,
+    devices: RwLock<HashMap<DeviceId, Arc<ThreadedDeviceType>>>,
     led_data_buffers: RwLock<HashMap<DeviceId, Sender<Vec<LED>>>>,
-    subscribed_events: SubscribedEvents,
     event_emitters: RwLock<Vec<crossbeam::channel::Sender<DeviceManagerEvent>>>,
-    fixture_to_device: HashMap<FixtureId, DeviceId>,
 }
 
-#[enum_dispatch(ThreadedDevice)]
+pub enum ThreadedDeviceType {
+    LEDDataOutput(ThreadedLEDOutputDeviceWrapper),
+    AuxiliaryData(ThreadedAuxiliaryDeviceWrapper)
+}
+
 pub enum DeviceType {
     LEDDataOutput(LEDDataOutputDeviceType),
     Auxiliary(AuxiliaryDataDeviceType)
-}
-
-#[enum_dispatch(ThreadedDevice)]
-pub enum LEDDataOutputDeviceType {
-    MQTT(MQTTSender),
-    UPD(UDPSender)
-}
-
-#[enum_dispatch(ThreadedDevice)]
-pub enum AuxiliaryDataDeviceType {
-    Noise(NoiseAuxiliaryDataDevice)
 }
 
 #[derive(Deserialize, Clone)]
@@ -110,11 +99,7 @@ impl DeviceManager {
         DeviceManager {
             devices: RwLock::new(HashMap::new()),
             led_data_buffers: RwLock::new(HashMap::new()),
-            subscribed_events: SubscribedEvents {
-                frame_resolver: vec![],
-            },
             event_emitters: RwLock::new(vec![]),
-            fixture_to_device: HashMap::new(),
         }
     }
 
@@ -124,18 +109,21 @@ impl DeviceManager {
         id: DeviceId,
     ) {
         let device: DeviceType = config.into();
-        let device = ThreadedDeviceWrapper::new(Box::new(device));
+        let device = match device {
+            DeviceType::LEDDataOutput(led_data_output) => ThreadedDeviceType::LEDDataOutput(ThreadedLEDOutputDeviceWrapper::new(led_data_output)),
+            DeviceType::Auxiliary(auxiliary) => ThreadedDeviceType::AuxiliaryData(ThreadedAuxiliaryDeviceWrapper::new(auxiliary)),
+        };
         self.add_device(id, device)
     }
 
-    pub fn get_device(&self, id: DeviceId) -> Option<Arc<ThreadedDeviceWrapper>> {
+    pub fn get_device(&self, id: DeviceId) -> Option<Arc<ThreadedDeviceType>> {
         self.devices.read().get(&id).map(Arc::clone)
     }
 
-    pub fn add_device(&self, id: DeviceId, device: ThreadedDeviceWrapper) {
+    pub fn add_device(&self, id: DeviceId, device: ThreadedDeviceType) {
         let mut devices_lock = self.devices.write();
         if devices_lock.contains_key(&id) {
-
+            todo!()
         }
 
         devices_lock.insert(id.clone(), Arc::new(device));
@@ -143,38 +131,8 @@ impl DeviceManager {
         self.emit_device_added(id);
     }
 
-    /*pub fn add_led_device(&self, id: DeviceId, mut device: Box<dyn LEDDataOutput>) {
-        let (sender, receiver) = channel(10); // TODO: Get channel size from config
-        device.set_data_buffer(receiver);
-
-        let threaded_device = ThreadedDeviceWrapper::new(device);
-        self.devices
-            .write()
-            .insert(id.clone(), Arc::new(threaded_device));
-        self.led_data_buffers.write().insert(id.clone(), sender);
-
-        self.emit_device_added(id);
-    }
-
-    pub fn add_auxiliary_device(&self, id: DeviceId, device: Box<dyn AuxiliaryDataDevice>) {
-        let threaded_device = ThreadedDeviceWrapper::new(device);
-        self.devices
-            .write()
-            .insert(id.clone(), Arc::new(threaded_device));
-
-        self.emit_device_added(id);
-    }*/
-
     pub fn remove_device(&self, _id: DeviceId) {
         todo!()
-    }
-
-    pub fn set_fixture_to_device(&mut self, fixture_id: FixtureId, device_id: DeviceId) {
-        self.fixture_to_device.insert(fixture_id, device_id);
-    }
-
-    pub fn listen_to_resolved_frames(&mut self, recv: Receiver<FrameResolverDataEvent>) {
-        self.subscribed_events.frame_resolver.push(recv);
     }
 
     pub fn subscribe_to_events(&mut self) -> crossbeam::channel::Receiver<DeviceManagerEvent> {

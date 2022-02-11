@@ -3,7 +3,9 @@ use rumqttc::{AsyncClient, MqttOptions, QoS};
 use tokio::{sync::broadcast::{Receiver, Sender, channel, error::TryRecvError}, task};
 use serde::Deserialize;
 
-use crate::{devices::{manager::{DeviceInput, DeviceInputType, DeviceOutput, DeviceOutputType}, threaded_device::{ThreadedDevice, ThreadedDeviceInputError, ThreadedDeviceOutputError}}, id::DeviceId};
+use crate::{devices::{manager::DeviceInput, threaded_device::ThreadedDevice}, id::DeviceId};
+
+use super::LEDOutputDevice;
 
 #[derive(Clone, Deserialize)]
 pub struct MQTTSenderConfig {
@@ -71,8 +73,8 @@ impl MQTTSender {
     }
 }
 
-impl ThreadedDevice for MQTTSender {
-    fn run(&mut self) {
+impl LEDOutputDevice for MQTTSender {
+    fn tick(&mut self) {
         match self.data_buffer_receiver.try_recv() {
             Err(err) => match err {
                 TryRecvError::Lagged(missed) => warn!("MQTT device lagged by {} frames! (MQTT Device {})", missed, self.id.unprotect()),
@@ -98,19 +100,4 @@ impl ThreadedDevice for MQTTSender {
         }
     }
 
-    fn get_inputs (&self) -> Vec<DeviceInputType> {
-        vec![DeviceInputType::LEDData]
-    }
-
-    fn get_outputs (&self) -> Vec<DeviceOutputType> {
-        vec![]
-    }
-
-    fn send_to_input (&self, _index: usize) -> Result<Sender<DeviceInput>, ThreadedDeviceInputError> {
-        Ok(self.data_buffer_sender.clone())
-    }
-
-    fn receive_output (&self, _index: usize) -> Result<Receiver<DeviceOutput>, ThreadedDeviceOutputError> {
-        Err(ThreadedDeviceOutputError::DoesNotExist)
-    }
 }

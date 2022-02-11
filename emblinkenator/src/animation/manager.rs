@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::{id::AnimationId, state::WantsDeviceState};
+use crate::id::AnimationId;
 
 use super::{Animation, AnimationTargetType, ShadersConfig, factory::{get_animation_registry, AnimationRegistry}};
 
@@ -64,11 +64,5 @@ impl AnimationManager {
 
     pub fn get_animation_states(&self) -> HashMap<AnimationId, Animation> {
         self.animations.lock().unwrap().clone()
-    }
-}
-
-impl WantsDeviceState for AnimationManager {
-    fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: crate::id::DeviceId) {
-        todo!()
     }
 }

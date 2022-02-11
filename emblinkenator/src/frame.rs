@@ -102,7 +102,16 @@ impl ThreadedObject for FrameTimeKeeper {
 
 impl WantsDeviceState for FrameTimeKeeper {
     fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: crate::id::DeviceId) {
-        todo!()
+        if let Some(device) = state.get_device(device_id) {
+            match *device {
+                crate::devices::manager::ThreadedDeviceType::LEDDataOutput(_) => {}, // Nothing to do
+                crate::devices::manager::ThreadedDeviceType::AuxiliaryData(aux_device) => {
+                    let (sender, reciever) = crossbeam::channel::bounded(1);
+                    aux_device.recieve_frame_data_buffer(reciever);
+                    self.send_frame_data_to(sender);
+                },
+            }
+        }
     }
 }
 

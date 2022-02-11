@@ -3,7 +3,7 @@ use log::error;
 use serde::Deserialize;
 use noise::NoiseFn;
 
-use crate::{auxiliary_data::AuxiliaryDataType, devices::threaded_device::ThreadedDevice, frame::FrameData, id::DeviceId, pipeline::PipelineContext};
+use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData, id::DeviceId, pipeline::PipelineContext};
 
 use super::AuxiliaryDataDevice;
 
@@ -79,10 +79,8 @@ impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
     fn send_into_buffer(&mut self, buffer: Sender<AuxiliaryDataType>) {
         self.data_output_buffer.replace(buffer);
     }
-}
 
-impl ThreadedDevice for NoiseAuxiliaryDataDevice {
-    fn run (&mut self) {
+    fn tick(&mut self) {
         let frame_data_buffer = self.frame_data_buffer.as_mut();
         if frame_data_buffer.is_none() {
             return
@@ -116,19 +114,4 @@ impl ThreadedDevice for NoiseAuxiliaryDataDevice {
         }
     }
 
-    fn get_inputs (&self) -> Vec<crate::devices::manager::DeviceInputType> {
-        todo!()
-    }
-
-    fn get_outputs (&self) -> Vec<crate::devices::manager::DeviceOutputType> {
-        todo!()
-    }
-
-    fn send_to_input (&self, _index: usize) -> Result<tokio::sync::broadcast::Sender<crate::devices::manager::DeviceInput>, crate::devices::threaded_device::ThreadedDeviceInputError> {
-        todo!()
-    }
-
-    fn receive_output (&self, _index: usize) -> Result<tokio::sync::broadcast::Receiver<crate::devices::manager::DeviceOutput>, crate::devices::threaded_device::ThreadedDeviceOutputError> {
-        todo!()
-    }
 }

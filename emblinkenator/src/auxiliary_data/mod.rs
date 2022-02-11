@@ -3,9 +3,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use log::{error, warn};
 use parking_lot::RwLock;
-use tokio::sync::broadcast::Receiver;
+use tokio::sync::broadcast::{Receiver, channel};
 
-use crate::devices::manager::DeviceManagerEvent;
 use crate::state::WantsDeviceState;
 use crate::{
     devices::manager::DeviceManager,
@@ -54,13 +53,7 @@ pub struct AuxiliaryDataManager {
     animation_auxiliary_sources: RwLock<HashMap<AnimationId, Vec<AuxiliaryId>>>,
     auxiliary_data_buffers: RwLock<HashMap<AuxiliaryId, Receiver<AuxiliaryData>>>,
     auxiliary_data: RwLock<HashMap<AuxiliaryId, AuxiliaryData>>,
-    subscribed_events: EventSubscribers,
     device_manager: Arc<RwLock<DeviceManager>>,
-}
-
-#[derive(Default)]
-struct EventSubscribers {
-    device_manager: Vec<crossbeam::channel::Receiver<DeviceManagerEvent>>,
 }
 
 impl AuxiliaryDataManager {
@@ -71,7 +64,6 @@ impl AuxiliaryDataManager {
             animation_auxiliary_sources: RwLock::new(HashMap::new()),
             auxiliary_data_buffers: RwLock::new(HashMap::new()),
             auxiliary_data: RwLock::new(HashMap::new()),
-            subscribed_events: EventSubscribers::default(),
         }
     }
 
@@ -83,11 +75,8 @@ impl AuxiliaryDataManager {
         self.animation_auxiliary_sources.read().clone()
     }
 
-    pub fn subscribe_to_device_manager_events(
-        &mut self,
-        event_receiver: crossbeam::channel::Receiver<DeviceManagerEvent>,
-    ) {
-        self.subscribed_events.device_manager.push(event_receiver);
+    fn read_aux_data_from(&mut self, auxiliary_id: AuxiliaryId, receiver: Receiver<AuxiliaryData>) {
+        self.auxiliary_data_buffers.write().insert(auxiliary_id, receiver);
     }
 }
 
@@ -116,31 +105,25 @@ impl ThreadedObject for AuxiliaryDataManager {
                 },
             }
         }
-
-        for device_manager in self.subscribed_events.device_manager.iter_mut() {
-            for event in device_manager.try_iter() {
-                match event {
-                    DeviceManagerEvent::DeviceAdded(device_id) => {
-                        if let Some(_device) =
-                            self.device_manager.read().get_device(device_id.clone())
-                        {
-                            todo!()
-                        }
-                        let aux_id = AuxiliaryId::new();
-                        self.auxiliary_to_device
-                            .write()
-                            .insert(aux_id.clone(), device_id.clone());
-                    }
-                    DeviceManagerEvent::DeviceRemoved(_device_id) => todo!(),
-                }
-            }
-        }
     }
 }
 
 impl WantsDeviceState for AuxiliaryDataManager {
     fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: DeviceId) {
-        todo!()
+        if let Some(device) = state.get_device(device_id) {
+            match *device {
+                crate::devices::manager::ThreadedDeviceType::LEDDataOutput(_) => {}, // Nothing to do
+                crate::devices::manager::ThreadedDeviceType::AuxiliaryData(aux_device) => {
+                    let aux_id = AuxiliaryId::new();
+                    self.auxiliary_to_device
+                        .write()
+                        .insert(aux_id.clone(), device_id.clone());
+                    let (sender, receiver) = channel(1);
+                    self.read_aux_data_from(aux_id, receiver);
+                    aux_device.send_into_buffer(sender);
+                },
+            }
+        }
     }
 }
 

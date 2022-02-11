@@ -2,9 +2,9 @@ use std::{collections::HashMap, sync::Arc};
 
 use log::{debug, warn};
 use parking_lot::RwLock;
-use tokio::sync::broadcast::{self, Receiver, error::TryRecvError};
+use tokio::sync::broadcast::{Receiver, error::TryRecvError};
 
-use crate::{animation::{manager::AnimationManager, AnimationTargetType}, event_loop::PipelineFrameOutput, id::{AnimationId, FixtureId}, led::LED, state::ThreadedObject, world::context::WorldContext};
+use crate::{animation::{manager::AnimationManager, AnimationTargetType}, event_loop::PipelineFrameOutput, id::{AnimationId, FixtureId, DeviceId}, led::LED, state::{ThreadedObject, WantsDeviceState}, world::context::WorldContext};
 
 const DATA_EVENT_CHANNEL_CAPACITY: usize = 60;
 
@@ -12,17 +12,7 @@ pub struct FrameResolver {
     input_data_buffer: Receiver<PipelineFrameOutput>,
     animation_manager: Arc<RwLock<AnimationManager>>,
     world_context: Arc<RwLock<WorldContext>>,
-    event_emitters: FrameResolverEventEmitters,
-}
-
-struct FrameResolverEventEmitters {
-    data: broadcast::Sender<FrameResolverDataEvent>,
-}
-
-#[derive(Debug, Clone)]
-pub struct FrameResolverDataEvent {
-    pub target: FixtureId,
-    pub data: Vec<LED>,
+    fixture_to_device: HashMap<FixtureId, DeviceId>,
 }
 
 struct FrameIntermediate {
@@ -40,12 +30,12 @@ impl FrameResolver {
             input_data_buffer,
             animation_manager,
             world_context,
-            event_emitters: FrameResolverEventEmitters::new(),
+            fixture_to_device: HashMap::new(),
         }
     }
 
-    pub fn subscribe_to_resolved_frames(&self) -> Receiver<FrameResolverDataEvent> {
-        self.event_emitters.data.subscribe()
+    pub fn set_fixture_to_device(&mut self, fixture_id: FixtureId, device_id: DeviceId) {
+        self.fixture_to_device.insert(fixture_id, device_id);
     }
 }
 
@@ -145,19 +135,15 @@ impl ThreadedObject for FrameResolver {
     }
 }
 
-impl FrameResolverEventEmitters {
-    fn new() -> Self {
-        FrameResolverEventEmitters {
-            data: broadcast::channel(DATA_EVENT_CHANNEL_CAPACITY).0,
-        }
-    }
-}
-
-impl FrameResolverDataEvent {
-    fn new(target: &FixtureId, data: &[LED]) -> Self {
-        FrameResolverDataEvent {
-            target: target.clone(),
-            data: data.to_vec(),
+impl WantsDeviceState for FrameResolver {
+    fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: DeviceId) {
+        if let Some(device) = state.get_device(device_id) {
+            match *device {
+                crate::devices::manager::ThreadedDeviceType::LEDDataOutput(led_output_device) => {
+                    
+                },
+                crate::devices::manager::ThreadedDeviceType::AuxiliaryData(_) => {}, // Nothing to do
+            }
         }
     }
 }

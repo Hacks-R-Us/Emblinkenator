@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 
 use crate::{
     animation::manager::AnimationManager, auxiliary_data::AuxiliaryDataManager,
-    frame::FrameTimeKeeper, pipeline::PipelineContext, world::context::WorldContext, devices::manager::{DeviceManager, DeviceManagerEvent}, id::DeviceId,
+    frame::FrameTimeKeeper, pipeline::PipelineContext, world::context::WorldContext, devices::manager::{DeviceManager, DeviceManagerEvent, ThreadedDeviceType}, id::DeviceId,
 };
 
 pub struct EmblinkenatorState {
@@ -44,7 +44,7 @@ impl EmblinkenatorState {
             frame_time_keeper: Arc::clone(&frame_time_keeper),
             world_context,
             pipeline_context_subscribers: vec![],
-            wants_device_state: vec![animation_manager, auxiliary_data_manager, frame_time_keeper],
+            wants_device_state: vec![auxiliary_data_manager, frame_time_keeper],
             device_manager_events
         }
     }
@@ -52,6 +52,10 @@ impl EmblinkenatorState {
     pub fn send_pipeline_context_to(&mut self, pipeline_context_buffer: Sender<PipelineContext>) {
         self.pipeline_context_subscribers
             .push(pipeline_context_buffer);
+    }
+
+    pub fn get_device(&mut self, id: DeviceId) -> Option<Arc<ThreadedDeviceType>> {
+        self.device_manager.write().get_device(id)
     }
 }
 

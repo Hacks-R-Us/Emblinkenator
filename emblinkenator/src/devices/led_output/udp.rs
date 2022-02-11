@@ -6,6 +6,8 @@ use std::net::UdpSocket;
 
 use crate::{devices::{manager::DeviceInput, threaded_device::ThreadedDevice}, id::DeviceId};
 
+use super::LEDOutputDevice;
+
 #[derive(Clone, Deserialize)]
 pub struct UDPSenderConfig {
     name: String,
@@ -54,8 +56,8 @@ impl UDPSender {
     }
 }
 
-impl ThreadedDevice for UDPSender {
-    fn run(&mut self) {
+impl LEDOutputDevice for UDPSender {
+    fn tick(&mut self) {
         match self.data_buffer_receiver.try_recv() {
             Err(err) => match err {
                 TryRecvError::Lagged(missed) => warn!("UDP device lagged by {} frames! (UDP Device {})", missed, self.id.unprotect()),
@@ -75,19 +77,4 @@ impl ThreadedDevice for UDPSender {
         }
     }
 
-    fn get_inputs (&self) -> Vec<crate::devices::manager::DeviceInputType> {
-        todo!()
-    }
-
-    fn get_outputs (&self) -> Vec<crate::devices::manager::DeviceOutputType> {
-        todo!()
-    }
-
-    fn send_to_input (&self, _index: usize) -> Result<Sender<DeviceInput>, crate::devices::threaded_device::ThreadedDeviceInputError> {
-        todo!()
-    }
-
-    fn receive_output (&self, _index: usize) -> Result<Receiver<crate::devices::manager::DeviceOutput>, crate::devices::threaded_device::ThreadedDeviceOutputError> {
-        todo!()
-    }
 }
