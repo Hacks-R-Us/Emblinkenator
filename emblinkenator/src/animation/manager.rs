@@ -31,6 +31,7 @@ impl AnimationManager {
 
     pub fn create_animation(
         &self,
+        id: AnimationId,
         shader_id: String,
         target: AnimationTargetType,
     ) -> Result<AnimationId, AnimationManagerError> {
@@ -43,8 +44,6 @@ impl AnimationManager {
         let manifest = manifest.unwrap();
 
         let animation = Animation::new(manifest, target);
-
-        let id = animation.id();
 
         self.animations
             .lock()

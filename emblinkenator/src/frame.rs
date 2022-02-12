@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crossbeam::channel::Sender;
 use log::{debug, warn};
 use parking_lot::RwLock;
@@ -17,8 +19,8 @@ struct FrameStats {
 }
 
 pub struct FrameTimeKeeper {
-    frame_data_senders: RwLock<Vec<Sender<FrameData>>>,
-    next_frame_data_senders: RwLock<Vec<Sender<FrameData>>>,
+    frame_data_senders: RwLock<HashMap<String, Sender<FrameData>>>,
+    next_frame_data_senders: RwLock<HashMap<String, Sender<FrameData>>>,
     frame_rate: u32,
     clock_frame: Interval,
     frame_data: FrameData,
@@ -35,8 +37,8 @@ impl FrameTimeKeeper {
         let clock_frame = time::interval(time::Duration::from_millis(frame_time));
 
         FrameTimeKeeper {
-            frame_data_senders: RwLock::new(vec![]),
-            next_frame_data_senders: RwLock::new(vec![]),
+            frame_data_senders: RwLock::new(HashMap::new()),
+            next_frame_data_senders: RwLock::new(HashMap::new()),
             frame_rate,
             clock_frame,
             frame_data: FrameData::new(0, frame_rate),
@@ -47,17 +49,17 @@ impl FrameTimeKeeper {
         }
     }
 
-    pub fn send_frame_data_to (&self, buffer: Sender<FrameData>) {
-        self.frame_data_senders.write().push(buffer);
+    pub fn send_frame_data_to (&self, receiver_id: String, buffer: Sender<FrameData>) {
+        self.frame_data_senders.write().insert(receiver_id, buffer);
     }
 
-    pub fn send_next_frame_data_to (&self, buffer: Sender<FrameData>) {
-        self.next_frame_data_senders.write().push(buffer);
+    pub fn send_next_frame_data_to (&self, receiver_id: String, buffer: Sender<FrameData>) {
+        self.next_frame_data_senders.write().insert(receiver_id, buffer);
     }
 }
 
 impl ThreadedObject for FrameTimeKeeper {
-    fn run(&mut self) {
+    fn tick(&mut self) {
         pollster::block_on(self.clock_frame.tick());
 
         let last_frame_start = self.frame_stats.frame_start_time;
@@ -90,11 +92,11 @@ impl ThreadedObject for FrameTimeKeeper {
 
         self.frame_stats = FrameStats::new(target_frame_time);
 
-        for sender in self.frame_data_senders.write().iter() {
+        for (_, sender) in self.frame_data_senders.write().iter() {
             sender.send(self.frame_data.clone()).ok();
         }
 
-        for sender in self.next_frame_data_senders.write().iter() {
+        for (_, sender) in self.next_frame_data_senders.write().iter() {
             sender.send(self.next_frame_data.clone()).ok();
         }
     }
@@ -102,13 +104,13 @@ impl ThreadedObject for FrameTimeKeeper {
 
 impl WantsDeviceState for FrameTimeKeeper {
     fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: crate::id::DeviceId) {
-        if let Some(device) = state.get_device(device_id) {
-            match *device {
+        if let Some(device) = state.get_device(&device_id) {
+            match &mut *device.write() {
                 crate::devices::manager::ThreadedDeviceType::LEDDataOutput(_) => {}, // Nothing to do
                 crate::devices::manager::ThreadedDeviceType::AuxiliaryData(aux_device) => {
-                    let (sender, reciever) = crossbeam::channel::bounded(1);
-                    aux_device.recieve_frame_data_buffer(reciever);
-                    self.send_frame_data_to(sender);
+                    let (sender, receiver) = crossbeam::channel::bounded(1);
+                    aux_device.receive_next_frame_data_buffer(receiver);
+                    self.send_next_frame_data_to(device_id.unprotect(), sender);
                 },
             }
         }

@@ -1,14 +1,11 @@
-use log::{debug, error};
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 
 use serde::Deserialize;
-use tokio::sync::broadcast::{error::TryRecvError, Receiver, Sender};
+use tokio::sync::broadcast::Sender;
 
 use crate::{
     auxiliary_data::{AuxiliaryDataType, AuxiliaryDataTypeConsumer},
-    frame::FrameData,
-    frame_resolver::FrameResolverDataEvent,
     id::DeviceId,
     led::LED,
     state::{ThreadedObject},
@@ -20,7 +17,7 @@ use super::{
 };
 
 pub struct DeviceManager {
-    devices: RwLock<HashMap<DeviceId, Arc<ThreadedDeviceType>>>,
+    devices: RwLock<HashMap<DeviceId, Arc<RwLock<ThreadedDeviceType>>>>,
     led_data_buffers: RwLock<HashMap<DeviceId, Sender<Vec<LED>>>>,
     event_emitters: RwLock<Vec<crossbeam::channel::Sender<DeviceManagerEvent>>>,
 }
@@ -69,13 +66,6 @@ pub enum DeviceOutput {
     Auxiliary(AuxiliaryDataType),
 }
 
-#[derive(Clone)]
-pub enum DeviceInput {
-    LEDData(Vec<LED>),
-    FrameData(FrameData),
-    NextFrameData(FrameData),
-}
-
 pub enum DeviceManagerErrorAddDevice {
     DeviceAlreadyExists(DeviceId),
 }
@@ -90,10 +80,6 @@ pub enum DeviceManagerEvent {
     DeviceRemoved(DeviceId),
 }
 
-struct SubscribedEvents {
-    frame_resolver: Vec<Receiver<FrameResolverDataEvent>>,
-}
-
 impl DeviceManager {
     pub fn new() -> DeviceManager {
         DeviceManager {
@@ -105,8 +91,8 @@ impl DeviceManager {
 
     pub fn add_device_from_config(
         &mut self,
-        config: DeviceConfigType,
         id: DeviceId,
+        config: DeviceConfigType,
     ) {
         let device: DeviceType = config.into();
         let device = match device {
@@ -116,8 +102,8 @@ impl DeviceManager {
         self.add_device(id, device)
     }
 
-    pub fn get_device(&self, id: DeviceId) -> Option<Arc<ThreadedDeviceType>> {
-        self.devices.read().get(&id).map(Arc::clone)
+    pub fn get_device(&self, id: &DeviceId) -> Option<Arc<RwLock<ThreadedDeviceType>>> {
+        self.devices.read().get(id).map(Arc::clone)
     }
 
     pub fn add_device(&self, id: DeviceId, device: ThreadedDeviceType) {
@@ -126,7 +112,7 @@ impl DeviceManager {
             todo!()
         }
 
-        devices_lock.insert(id.clone(), Arc::new(device));
+        devices_lock.insert(id.clone(), Arc::new(RwLock::new(device)));
 
         self.emit_device_added(id);
     }
@@ -154,42 +140,7 @@ impl DeviceManager {
 }
 
 impl ThreadedObject for DeviceManager {
-    fn run(&mut self) {
-        for event_subscriber in self.subscribed_events.frame_resolver.iter_mut() {
-            let event = event_subscriber.try_recv();
-
-            if event.is_err() {
-                if let Err(err) = event {
-                    match err {
-                        TryRecvError::Lagged(messages) => {
-                            error!(
-                                "Device manager lagged behind pipeline by {} messages",
-                                messages
-                            );
-                        }
-                        TryRecvError::Closed => {
-                            panic!("Frame resolver message channel closed");
-                        }
-                        TryRecvError::Empty => {}
-                    }
-                }
-                continue;
-            }
-
-            let event = event.unwrap();
-
-            debug!("{:?}", event);
-
-            let device_id = self.fixture_to_device.get(&event.target);
-            if device_id.is_none() {
-                continue;
-            }
-            let device_id = device_id.unwrap();
-            if let Some(sender) = self.led_data_buffers.read().get(device_id) {
-                sender.send(event.data).ok();
-            }
-        }
-    }
+    fn tick(&mut self) {}
 }
 
 impl From<DeviceConfigType> for DeviceType {

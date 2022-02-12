@@ -20,8 +20,8 @@ pub struct EmblinkenatorState {
 }
 
 pub trait ThreadedObject: Sync + Send {
-    // Do not loop inside run!
-    fn run(&mut self);
+    /// Do not loop inside tick!
+    fn tick(&mut self);
 }
 
 pub trait WantsDeviceState: Sync + Send {
@@ -54,13 +54,13 @@ impl EmblinkenatorState {
             .push(pipeline_context_buffer);
     }
 
-    pub fn get_device(&mut self, id: DeviceId) -> Option<Arc<ThreadedDeviceType>> {
+    pub fn get_device(&self, id: &DeviceId) -> Option<Arc<RwLock<ThreadedDeviceType>>> {
         self.device_manager.write().get_device(id)
     }
 }
 
 impl ThreadedObject for EmblinkenatorState {
-    fn run(&mut self) {
+    fn tick(&mut self) {
         for pipeline_context_buffer in &self.pipeline_context_subscribers {
             if pipeline_context_buffer.is_full() {
                 continue;

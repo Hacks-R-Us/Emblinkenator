@@ -31,9 +31,9 @@ A `Fixture` is then mapped to some hardware device such as an Arduino. Mappings 
 
 First, get set up with a Rust environment (Note: Right now WSL support is likely to be spotty due to limited access to GPU resources).
 
-Then create a file called `startup_config.json` in the root directory of this project. Inside the `emblinkenator` directory there is a file called `startup_config.json.example`, copy the contents of this file to `startup_config.json` and change the settings to match your needs. This is a temporary measure until a UI is developed, it will create the initial configuration of the system. Note that the `led_positions` value is optional, if omitted all LED positions will be set to the world origin (0, 0, 0).
+Then create a file called `startup-config.json` in the root directory of this project. Inside the `emblinkenator` directory there is a file called `startup-config.json.example`, copy the contents of this file to `startup-config.json` and change the settings to match your needs. This is a temporary measure until a UI is developed, it will create the initial configuration of the system. Note that the `led_positions` value is optional, if omitted all LED positions will be set to the world origin (0, 0, 0).
 
-Next, or meanwhile, flash your hardware with some code that can recieve a buffer of (X) RGB values where (X) is the number of LEDs attached to the hardware. At the moment the supported transport streams are a direct UDP connection, or a MQTT connection via a third-party broker. Example implementations for both are available for the NodeMCU platform in the `examples/hardware` directory.
+Next, or meanwhile, flash your hardware with some code that can receive a buffer of (X) RGB values where (X) is the number of LEDs attached to the hardware. At the moment the supported transport streams are a direct UDP connection, or a MQTT connection via a third-party broker. Example implementations for both are available for the NodeMCU platform in the `examples/hardware` directory.
 
 Finally, run `cargo run`, and you should get some blinking LEDs! Or, you may get a Segfault.
 

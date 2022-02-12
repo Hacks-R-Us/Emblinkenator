@@ -1,9 +1,8 @@
-use crossbeam::channel::{Receiver, Sender};
 use log::error;
 use serde::Deserialize;
 use noise::NoiseFn;
 
-use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData, id::DeviceId, pipeline::PipelineContext};
+use crate::{auxiliary_data::{AuxiliaryDataType, AuxiliaryData}, frame::FrameData, id::DeviceId};
 
 use super::AuxiliaryDataDevice;
 
@@ -24,9 +23,8 @@ pub struct NoiseAuxiliaryConfig {
 pub struct NoiseAuxiliaryDataDevice {
     id: DeviceId,
     noise_function: NoiseFunction,
-    frame_data_buffer: Option<Receiver<FrameData>>,
-    pipeline_context_buffer: Option<Receiver<PipelineContext>>,
-    data_output_buffer: Option<Sender<AuxiliaryDataType>>,
+    next_frame_data_buffer: Option<crossbeam::channel::Receiver<FrameData>>,
+    data_output_buffer: Option<tokio::sync::broadcast::Sender<AuxiliaryData>>,
 }
 
 impl NoiseAuxiliaryDataDevice {
@@ -40,13 +38,12 @@ impl NoiseAuxiliaryDataDevice {
         NoiseAuxiliaryDataDevice {
             id,
             noise_function,
-            frame_data_buffer: None,
-            pipeline_context_buffer: None,
+            next_frame_data_buffer: None,
             data_output_buffer: None
         }
     }
 
-    fn get_noise_for_frame (&self, frame_data: FrameData) -> AuxiliaryDataType {
+    fn get_noise_for_frame (&self, frame_data: FrameData) -> AuxiliaryData {
         let time_point = frame_data.frame / frame_data.frame_rate;
 
         match self.noise_function {
@@ -65,50 +62,37 @@ impl NoiseAuxiliaryDataDevice {
                     res.push(y_vec);
                 }
 
-                AuxiliaryDataType::F32Vec3(res)
+                AuxiliaryData::new(AuxiliaryDataType::F32Vec3(res), u64::pow(1000, 3))
             }
         }
     }
 }
 
 impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
-    fn recieve_frame_data_buffer(&mut self, buffer: Receiver<FrameData>) {
-        self.frame_data_buffer.replace(buffer);
+    fn receive_next_frame_data_buffer(&mut self, buffer: crossbeam::channel::Receiver<FrameData>) {
+        self.next_frame_data_buffer.replace(buffer);
     }
 
-    fn send_into_buffer(&mut self, buffer: Sender<AuxiliaryDataType>) {
+    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryData>) {
         self.data_output_buffer.replace(buffer);
     }
 
     fn tick(&mut self) {
-        let frame_data_buffer = self.frame_data_buffer.as_mut();
-        if frame_data_buffer.is_none() {
+        let next_frame_data_buffer = self.next_frame_data_buffer.as_mut();
+        if next_frame_data_buffer.is_none() {
             return
         }
 
-        let pipeline_context_buffer = self.pipeline_context_buffer.as_mut();
-        if pipeline_context_buffer.is_none() {
-            return
-        }
+        let next_frame_data_buffer = next_frame_data_buffer.unwrap();
+        let next_frame_data = next_frame_data_buffer.recv();
 
-        let frame_data_buffer = frame_data_buffer.unwrap();
-        let frame_data = frame_data_buffer.recv();
-
-        let pipeline_context_buffer = pipeline_context_buffer.unwrap();
-        let pipeline_context = pipeline_context_buffer.recv();
-
-        if frame_data.is_err() {
+        if next_frame_data.is_err() {
             error!("Frame data buffer exists but is closed! (Noise Device {})", self.id.unprotect());
             return
         }
-        let frame_data = frame_data.unwrap();
+        let next_frame_data = next_frame_data.unwrap();
 
-        if pipeline_context.is_err() {
-            error!("Pipeline context buffer exists but is closed! (Noise Device {})", self.id.unprotect());
-            return
-        }
-
-        let data = self.get_noise_for_frame(frame_data);
+        let data = self.get_noise_for_frame(next_frame_data);
         if let Some(data_output_buffer) = self.data_output_buffer.as_mut() {
             data_output_buffer.send(data).ok();
         }

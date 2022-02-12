@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use log::{error, warn};
 use parking_lot::RwLock;
@@ -7,7 +7,6 @@ use tokio::sync::broadcast::{Receiver, channel};
 
 use crate::state::WantsDeviceState;
 use crate::{
-    devices::manager::DeviceManager,
     id::{AnimationId, AuxiliaryId, DeviceId},
     state::ThreadedObject,
 };
@@ -50,17 +49,17 @@ pub enum AuxiliaryDataTypeConsumer {
 
 pub struct AuxiliaryDataManager {
     auxiliary_to_device: RwLock<HashMap<AuxiliaryId, DeviceId>>,
+    device_to_auxiliary: RwLock<HashMap<DeviceId, AuxiliaryId>>,
     animation_auxiliary_sources: RwLock<HashMap<AnimationId, Vec<AuxiliaryId>>>,
     auxiliary_data_buffers: RwLock<HashMap<AuxiliaryId, Receiver<AuxiliaryData>>>,
     auxiliary_data: RwLock<HashMap<AuxiliaryId, AuxiliaryData>>,
-    device_manager: Arc<RwLock<DeviceManager>>,
 }
 
 impl AuxiliaryDataManager {
-    pub fn new(device_manager: Arc<RwLock<DeviceManager>>) -> Self {
+    pub fn new() -> Self {
         AuxiliaryDataManager {
-            device_manager,
             auxiliary_to_device: RwLock::new(HashMap::new()),
+            device_to_auxiliary: RwLock::new(HashMap::new()),
             animation_auxiliary_sources: RwLock::new(HashMap::new()),
             auxiliary_data_buffers: RwLock::new(HashMap::new()),
             auxiliary_data: RwLock::new(HashMap::new()),
@@ -75,13 +74,26 @@ impl AuxiliaryDataManager {
         self.animation_auxiliary_sources.read().clone()
     }
 
+    pub fn set_animation_auxiliary_sources_to(&self, animation_id: AnimationId, sources: Vec<AuxiliaryId>) {
+        // TODO: Validate all sources exist
+        // TODO: Validate vec is the correct length
+        self.animation_auxiliary_sources.write().insert(animation_id, sources);
+    }
+
+    pub fn hack_set_animation_auxiliary_sources_to_device_ids(&self, animation_id: AnimationId, sources: Vec<DeviceId>) {
+        let animation_sources: Vec<AuxiliaryId> = sources.iter().map(|device_id| 
+            self.device_to_auxiliary.write().get(device_id).cloned().expect(&format!("Device {} does not exist!", device_id))
+        ).collect();
+        self.set_animation_auxiliary_sources_to(animation_id, animation_sources);
+    }
+
     fn read_aux_data_from(&mut self, auxiliary_id: AuxiliaryId, receiver: Receiver<AuxiliaryData>) {
         self.auxiliary_data_buffers.write().insert(auxiliary_id, receiver);
     }
 }
 
 impl ThreadedObject for AuxiliaryDataManager {
-    fn run(&mut self) {
+    fn tick(&mut self) {
         for (aux_id, data_buffer) in self.auxiliary_data_buffers.write().iter_mut() {
             match data_buffer.try_recv() {
                 Ok(data) => {
@@ -110,8 +122,8 @@ impl ThreadedObject for AuxiliaryDataManager {
 
 impl WantsDeviceState for AuxiliaryDataManager {
     fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: DeviceId) {
-        if let Some(device) = state.get_device(device_id) {
-            match *device {
+        if let Some(device) = state.get_device(&device_id) {
+            match &mut *device.write() {
                 crate::devices::manager::ThreadedDeviceType::LEDDataOutput(_) => {}, // Nothing to do
                 crate::devices::manager::ThreadedDeviceType::AuxiliaryData(aux_device) => {
                     let aux_id = AuxiliaryId::new();
@@ -119,8 +131,8 @@ impl WantsDeviceState for AuxiliaryDataManager {
                         .write()
                         .insert(aux_id.clone(), device_id.clone());
                     let (sender, receiver) = channel(1);
-                    self.read_aux_data_from(aux_id, receiver);
                     aux_device.send_into_buffer(sender);
+                    self.read_aux_data_from(aux_id, receiver);
                 },
             }
         }

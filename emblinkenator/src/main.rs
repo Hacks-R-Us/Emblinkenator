@@ -1,6 +1,5 @@
 #![feature(drain_filter)]
 #![feature(map_try_insert)]
-#![feature(trait_upcasting)]
 
 #![deny(clippy::all)]
 #![warn(clippy::perf)]
@@ -11,15 +10,19 @@
 
 use std::{fs, path::Path, sync::Arc, thread::{self, JoinHandle, sleep}, time::Duration};
 
+use animation::AnimationTargetType;
 use color_eyre::Report;
 
+use config::{StartupConfig, StartupAnimationTargetType};
 use devices::manager::DeviceManager;
 use event_loop::GPUEventLoop;
 use frame_resolver::FrameResolver;
 use futures::executor::block_on;
+use id::{FixtureId, InstallationId, GroupId, DeviceId, AnimationId};
 use parking_lot::RwLock;
 use pipeline::build_pipeline;
 use state::ThreadedObject;
+use world::{Coord, fixture::{Fixture, FixtureProps}};
 
 use crate::{animation::{manager::AnimationManager}, auxiliary_data::AuxiliaryDataManager, frame::FrameTimeKeeper};
 use crate::config::{EmblinkenatorConfig};
@@ -64,9 +67,9 @@ async fn main() {
     let leds_per_compute_group = emblinkenator_config.leds_per_compute_group();
 
     // Create buffers for state transfer
-    let (frame_resolver_buffer_sender, frame_resolver_buffer_reciever) =
+    let (frame_resolver_buffer_sender, frame_resolver_buffer_receiver) =
         tokio::sync::broadcast::channel(emblinkenator_config.frame_buffer_size() as _);
-    let (pipeline_context_buffer_sender, pipeline_context_buffer_reciever) =
+    let (pipeline_context_buffer_sender, pipeline_context_buffer_receiver) =
         crossbeam::channel::bounded(emblinkenator_config.frame_buffer_size() as _);
     let (event_loop_frame_data_buffer_sender, event_loop_frame_data_buffer_receiver) = crossbeam::channel::bounded(1);
 
@@ -75,7 +78,7 @@ async fn main() {
 
     // Applies backpressure to move to next frame in time
     let frame_time_keeper = FrameTimeKeeper::new(frame_rate, u128::from(emblinkenator_config.frame_buffer_size));
-    frame_time_keeper.send_frame_data_to(event_loop_frame_data_buffer_sender);
+    frame_time_keeper.send_frame_data_to("event_loop".to_string(), event_loop_frame_data_buffer_sender);
 
     // Create state objects
     let world_context = Arc::new(RwLock::new(WorldContext::new(world_context_collection)));
@@ -83,10 +86,10 @@ async fn main() {
     let frame_resolver = FrameResolver::new(
         Arc::clone(&animation_manager),
         Arc::clone(&world_context),
-        frame_resolver_buffer_reciever,
+        frame_resolver_buffer_receiver,
     );
     let device_manager = Arc::new(RwLock::new(DeviceManager::new()));
-    let auxiliary_manager = AuxiliaryDataManager::new(Arc::clone(&device_manager));
+    let auxiliary_manager = AuxiliaryDataManager::new();
     let pipeline = build_pipeline(leds_per_compute_group).await;
 
     // Put objects behind RwLock if they're not already
@@ -106,16 +109,9 @@ async fn main() {
 
     let state = Arc::new(RwLock::new(state));
 
-    // Subscribe to events
-    {
-        device_manager
-            .write()
-            .listen_to_resolved_frames(frame_resolver.read().subscribe_to_resolved_frames());
-    }
-
     // Temp, setup stuff from config
     {
-        /*let startup_config_json = fs::read_to_string("startup_config.json").expect("Unable to read startup config file");
+        let startup_config_json = fs::read_to_string("startup-config.json").expect("Unable to read startup config file");
         let startup_config: StartupConfig = serde_json::from_str(&startup_config_json).unwrap();
         for fixture in startup_config.fixtures {
             let mut positions = match fixture.led_positions {
@@ -142,45 +138,28 @@ async fn main() {
                 StartupAnimationTargetType::Installation(id) => AnimationTargetType::Installation(InstallationId::new_from(id)),
                 StartupAnimationTargetType::Group(id) => AnimationTargetType::Group(GroupId::new_from(id)),
             };
-            animation_manager.write().create_animation(animation.shader_id, target).unwrap();
+            animation_manager.write().create_animation(AnimationId::new_from(animation.id), animation.shader_id, target).unwrap();
         }
 
         for startup_device in startup_config.devices {
-            match startup_device.config {
-                DeviceConfigType::LEDDataOutput(output) => match output {
-                        LEDOutputConfigType::MQTT(config) => {
-                            let mqtt_device = MQTTSender::new(DeviceId::new_from(startup_device.id.clone()), config);
-                            device_manager.write().add_led_device(
-                                DeviceId::new_from(startup_device.id.clone()),
-                                Box::new(mqtt_device)
-                            );
-                        },
-                        LEDOutputConfigType::UDP(config) => {
-                            let udp_device = UDPSender::new(DeviceId::new_from(startup_device.id.clone()), config);
-                            device_manager.write().add_led_device(
-                                DeviceId::new_from(startup_device.id.clone()),
-                                Box::new(udp_device)
-                            );
-                        }
-                }
-                DeviceConfigType::Auxiliary(aux) => match aux {
-                    AuxiliaryDataConfigType::Noise(config) => {
-                        let noise_aux = NoiseAuxiliaryDataDevice::new(DeviceId::new_from(startup_device.id.clone()), config);
-                        device_manager.write().add_auxiliary_device(DeviceId::new_from(startup_device.id.clone()), Box::new(noise_aux));
-                    },
-                },
-            };
+            device_manager.write().add_device_from_config(DeviceId::new_from(startup_device.id.clone()), startup_device.config);
         }
 
         for mapping in startup_config.fixtures_to_device {
-            device_manager.write().set_fixture_to_device(FixtureId::new_from(mapping.0), DeviceId::new_from(mapping.1));
-        }*/
+            frame_resolver.write().set_fixture_to_device(FixtureId::new_from(mapping.0), DeviceId::new_from(mapping.1));
+        }
+
+        for (animation_id, device_ids) in startup_config.animation_auxiliary_sources {
+            let animation_id = AnimationId::new_from(animation_id);
+            let device_ids: Vec<DeviceId> = device_ids.iter().map(|id| DeviceId::new_from(id.to_string())).collect();
+            auxiliary_manager.write().hack_set_animation_auxiliary_sources_to_device_ids(animation_id, device_ids);
+        }
     }
 
     let mut event_loop = GPUEventLoop::new(
         pipeline,
         event_loop_frame_data_buffer_receiver,
-        pipeline_context_buffer_reciever,
+        pipeline_context_buffer_receiver,
         frame_resolver_buffer_sender,
     );
 
@@ -194,7 +173,7 @@ async fn main() {
 
     for obj in threaded_objects {
         let handle = thread::spawn(move || 'work: loop {
-            obj.write().run();
+            obj.write().tick();
 
             sleep(Duration::from_millis(1));
 
@@ -207,7 +186,7 @@ async fn main() {
 
     // TODO: Remove this once event_loop is no longer async (when polling)
     handles.push(thread::spawn(move || 'work: loop {
-        block_on(event_loop.run());
+        block_on(event_loop.tick());
 
         sleep(Duration::from_millis(1));
 

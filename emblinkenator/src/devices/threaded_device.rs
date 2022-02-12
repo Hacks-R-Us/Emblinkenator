@@ -9,7 +9,7 @@ pub struct ThreadedDeviceWrapper {
 
 #[enum_dispatch]
 pub trait ThreadedDevice: Send {
-    fn run (&mut self);
+    fn tick (&mut self);
 }
 
 impl ThreadedDeviceWrapper {
@@ -21,7 +21,7 @@ impl ThreadedDeviceWrapper {
 
         let handle = Some(thread::spawn(move || {
             while alive.load(Ordering::SeqCst) {
-                device.run();
+                device.tick();
 
                 sleep(Duration::from_millis(1));
             }

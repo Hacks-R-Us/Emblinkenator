@@ -32,6 +32,7 @@ pub struct StartupFixture {
 
 #[derive(Deserialize)]
 pub struct StartupAnimations {
+    pub id: String,
     pub shader_id: String,
     pub target_id: StartupAnimationTargetType
 }

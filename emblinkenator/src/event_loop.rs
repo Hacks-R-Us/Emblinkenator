@@ -61,7 +61,7 @@ impl GPUEventLoop {
         }
     }
 
-    pub async fn run(&mut self) {
+    pub async fn tick(&mut self) {
         self.state = GPUEventLoopState::BeforeFrame;
 
         // TODO: Any awaited steps here should likely either block directly or be run in a polling mode. May be waiting on upstream WebGPU work.

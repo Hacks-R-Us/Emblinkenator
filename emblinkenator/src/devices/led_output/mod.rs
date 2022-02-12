@@ -4,12 +4,17 @@ pub mod udp;
 use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::{JoinHandle, self, sleep}, time::Duration};
 
 use enum_dispatch::enum_dispatch;
+use parking_lot::RwLock;
+use tokio::sync::broadcast::Receiver;
+
+use crate::frame_resolver::LEDFrame;
 
 use self::{mqtt::MQTTSender, udp::UDPSender};
 
 #[enum_dispatch]
 pub trait LEDOutputDevice: Send + Sync {
     fn tick (&mut self);
+    fn receive_data_from(&mut self, buffer: Receiver<LEDFrame>);
 }
 
 #[enum_dispatch(LEDOutputDevice)]
@@ -19,6 +24,7 @@ pub enum LEDDataOutputDeviceType {
 }
 
 pub struct ThreadedLEDOutputDeviceWrapper {
+    device: Arc<RwLock<LEDDataOutputDeviceType>>,
     running: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
 }
@@ -30,15 +36,19 @@ impl ThreadedLEDOutputDeviceWrapper {
 
         let alive = running.clone();
 
+        let device = Arc::new(RwLock::new(device));
+        let device_thread = Arc::clone(&device);
+
         let handle = Some(thread::spawn(move || {
             while alive.load(Ordering::SeqCst) {
-                device.tick();
+                device_thread.write().tick();
 
                 sleep(Duration::from_millis(1));
             }
         }));
 
         ThreadedLEDOutputDeviceWrapper {
+            device,
             running,
             handle,
         }
@@ -49,5 +59,9 @@ impl ThreadedLEDOutputDeviceWrapper {
         self.handle
             .take().expect("Called stop on non-running thread")
             .join().expect("Could not join spawned thread");
+    }
+
+    pub fn receive_data_from(&mut self, buffer: Receiver<LEDFrame>) {
+        self.device.write().receive_data_from(buffer)
     }
 }
