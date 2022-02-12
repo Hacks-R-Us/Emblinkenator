@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 
 use crate::{
     animation::manager::AnimationManager, auxiliary_data::AuxiliaryDataManager,
-    frame::FrameTimeKeeper, pipeline::PipelineContext, world::context::WorldContext, devices::manager::{DeviceManager, DeviceManagerEvent, ThreadedDeviceType}, id::DeviceId,
+    frame::FrameTimeKeeper, pipeline::PipelineContext, world::context::WorldContext, devices::manager::{DeviceManager, DeviceManagerEvent, ThreadedDeviceType}, id::DeviceId, frame_resolver::FrameResolver,
 };
 
 pub struct EmblinkenatorState {
@@ -13,6 +13,7 @@ pub struct EmblinkenatorState {
     auxiliary_data_manager: Arc<RwLock<AuxiliaryDataManager>>,
     device_manager: Arc<RwLock<DeviceManager>>,
     frame_time_keeper: Arc<RwLock<FrameTimeKeeper>>,
+    frame_resolver: Arc<RwLock<FrameResolver>>,
     world_context: Arc<RwLock<WorldContext>>,
     pipeline_context_subscribers: Vec<crossbeam::channel::Sender<PipelineContext>>,
     wants_device_state: Vec<Arc<RwLock<dyn WantsDeviceState>>>,
@@ -34,6 +35,7 @@ impl EmblinkenatorState {
         auxiliary_data_manager: Arc<RwLock<AuxiliaryDataManager>>,
         device_manager: Arc<RwLock<DeviceManager>>,
         frame_time_keeper: Arc<RwLock<FrameTimeKeeper>>,
+        frame_resolver: Arc<RwLock<FrameResolver>>,
         world_context: Arc<RwLock<WorldContext>>,
     ) -> EmblinkenatorState {
         let device_manager_events = device_manager.write().subscribe_to_events();
@@ -42,9 +44,10 @@ impl EmblinkenatorState {
             auxiliary_data_manager: Arc::clone(&auxiliary_data_manager),
             device_manager,
             frame_time_keeper: Arc::clone(&frame_time_keeper),
+            frame_resolver: Arc::clone(&frame_resolver),
             world_context,
             pipeline_context_subscribers: vec![],
-            wants_device_state: vec![auxiliary_data_manager, frame_time_keeper],
+            wants_device_state: vec![auxiliary_data_manager, frame_time_keeper, frame_resolver],
             device_manager_events
         }
     }

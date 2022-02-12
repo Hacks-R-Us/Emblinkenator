@@ -6,8 +6,6 @@ use tokio::sync::broadcast::{Receiver, error::TryRecvError, Sender};
 
 use crate::{animation::{manager::AnimationManager, AnimationTargetType}, event_loop::PipelineFrameOutput, id::{AnimationId, FixtureId, DeviceId}, led::LED, state::{ThreadedObject, WantsDeviceState}, world::context::WorldContext};
 
-const DATA_EVENT_CHANNEL_CAPACITY: usize = 60;
-
 pub type LEDFrame = Vec<LED>;
 
 pub struct FrameResolver {
@@ -63,6 +61,12 @@ impl ThreadedObject for FrameResolver {
                 }
             }
         }
+
+        if compute_outputs.len() == 0 {
+            return
+        }
+
+        debug!("Frame Resolver received {} compute outputs", compute_outputs.len());
 
         {
             let animation_manager = self.animation_manager.read();
@@ -137,9 +141,10 @@ impl ThreadedObject for FrameResolver {
                 if device_id.is_none() {
                     continue;
                 }
+
                 let device_id = device_id.unwrap();
                 if let Some(sender) = self.device_buffers.get(device_id) {
-                    debug!("Sending data to {}", device_id);
+                    debug!("Sending frame to {}", device_id);
                     sender.send(fixture_data).ok();
                 }
             }

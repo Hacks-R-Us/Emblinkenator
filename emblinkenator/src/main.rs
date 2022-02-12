@@ -103,6 +103,7 @@ async fn main() {
         Arc::clone(&auxiliary_manager),
         Arc::clone(&device_manager),
         Arc::clone(&frame_time_keeper),
+        Arc::clone(&frame_resolver),
         Arc::clone(&world_context),
     );
     state.send_pipeline_context_to(pipeline_context_buffer_sender);

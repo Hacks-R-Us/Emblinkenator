@@ -7,7 +7,7 @@ use self::factory::AnimationManifest;
 pub mod factory;
 pub mod manager;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Animation {
     id: AnimationId,
     manifest: AnimationManifest,

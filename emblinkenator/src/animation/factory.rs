@@ -7,7 +7,7 @@ use crate::auxiliary_data::AuxiliaryDataTypeConsumer;
 
 use super::ShadersConfig;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AnimationManifest {
     pub shader: String,
     pub auxiliaries: Option<Vec<AuxiliaryDataTypeConsumer>>

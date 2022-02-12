@@ -16,7 +16,7 @@ pub struct EmblinkenatorPipeline {
     current_context: Option<PipelineContext>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PipelineContext {
     // String -> Fixture/Installation/Group Id
     pub led_positions: HashMap<String, Vec<Coord>>,
