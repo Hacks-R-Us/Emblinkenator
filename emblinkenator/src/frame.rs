@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crossbeam::channel::Sender;
 use log::{debug, warn};
 use parking_lot::RwLock;
 use tokio::time::{self, Instant, Interval};
@@ -19,8 +18,10 @@ struct FrameStats {
 }
 
 pub struct FrameTimeKeeper {
-    frame_data_senders: RwLock<HashMap<String, Sender<FrameData>>>,
-    next_frame_data_senders: RwLock<HashMap<String, Sender<FrameData>>>,
+    frame_data_blocking_senders: RwLock<HashMap<String, crossbeam::channel::Sender<FrameData>>>,
+    next_frame_data_blocking_senders: RwLock<HashMap<String, crossbeam::channel::Sender<FrameData>>>,
+    frame_data_non_blocking_senders: RwLock<HashMap<String, tokio::sync::broadcast::Sender<FrameData>>>,
+    next_frame_data_non_blocking_senders: RwLock<HashMap<String, tokio::sync::broadcast::Sender<FrameData>>>,
     frame_rate: u32,
     clock_frame: Interval,
     frame_data: FrameData,
@@ -37,8 +38,10 @@ impl FrameTimeKeeper {
         let clock_frame = time::interval(time::Duration::from_millis(frame_time));
 
         FrameTimeKeeper {
-            frame_data_senders: RwLock::new(HashMap::new()),
-            next_frame_data_senders: RwLock::new(HashMap::new()),
+            frame_data_blocking_senders: RwLock::new(HashMap::new()),
+            next_frame_data_blocking_senders: RwLock::new(HashMap::new()),
+            frame_data_non_blocking_senders: RwLock::new(HashMap::new()),
+            next_frame_data_non_blocking_senders: RwLock::new(HashMap::new()),
             frame_rate,
             clock_frame,
             frame_data: FrameData::new(0, frame_rate),
@@ -49,12 +52,20 @@ impl FrameTimeKeeper {
         }
     }
 
-    pub fn send_frame_data_to (&self, receiver_id: String, buffer: Sender<FrameData>) {
-        self.frame_data_senders.write().insert(receiver_id, buffer);
+    pub fn send_frame_data_to_blocking (&self, receiver_id: String, buffer: crossbeam::channel::Sender<FrameData>) {
+        self.frame_data_blocking_senders.write().insert(receiver_id, buffer);
     }
 
-    pub fn send_next_frame_data_to (&self, receiver_id: String, buffer: Sender<FrameData>) {
-        self.next_frame_data_senders.write().insert(receiver_id, buffer);
+    pub fn send_frame_data_to_non_blocking (&self, receiver_id: String, buffer: tokio::sync::broadcast::Sender<FrameData>) {
+        self.frame_data_non_blocking_senders.write().insert(receiver_id, buffer);
+    }
+
+    pub fn send_next_frame_data_to_blocking (&self, receiver_id: String, buffer: crossbeam::channel::Sender<FrameData>) {
+        self.next_frame_data_blocking_senders.write().insert(receiver_id, buffer);
+    }
+
+    pub fn send_next_frame_data_to_non_blocking (&self, receiver_id: String, buffer: tokio::sync::broadcast::Sender<FrameData>) {
+        self.next_frame_data_non_blocking_senders.write().insert(receiver_id, buffer);
     }
 }
 
@@ -92,11 +103,19 @@ impl ThreadedObject for FrameTimeKeeper {
 
         self.frame_stats = FrameStats::new(target_frame_time);
 
-        for (_, sender) in self.frame_data_senders.write().iter() {
+        for (_, sender) in self.frame_data_blocking_senders.write().iter() {
             sender.send(self.frame_data.clone()).ok();
         }
 
-        for (_, sender) in self.next_frame_data_senders.write().iter() {
+        for (_, sender) in self.frame_data_non_blocking_senders.write().iter() {
+            sender.send(self.frame_data.clone()).ok();
+        }
+
+        for (_, sender) in self.next_frame_data_blocking_senders.write().iter() {
+            sender.send(self.next_frame_data.clone()).ok();
+        }
+
+        for (_, sender) in self.next_frame_data_non_blocking_senders.write().iter() {
             sender.send(self.next_frame_data.clone()).ok();
         }
     }
@@ -108,9 +127,9 @@ impl WantsDeviceState for FrameTimeKeeper {
             match &mut *device.write() {
                 crate::devices::manager::ThreadedDeviceType::LEDDataOutput(_) => {}, // Nothing to do
                 crate::devices::manager::ThreadedDeviceType::AuxiliaryData(aux_device) => {
-                    let (sender, receiver) = crossbeam::channel::bounded(1);
+                    let (sender, receiver) = tokio::sync::broadcast::channel(1);
                     aux_device.receive_next_frame_data_buffer(receiver);
-                    self.send_next_frame_data_to(device_id.unprotect(), sender);
+                    self.send_next_frame_data_to_non_blocking(device_id.unprotect(), sender);
                 },
             }
         }

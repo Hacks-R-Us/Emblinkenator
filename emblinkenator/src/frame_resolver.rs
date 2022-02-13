@@ -71,6 +71,7 @@ impl ThreadedObject for FrameResolver {
         {
             let animation_manager = self.animation_manager.read();
             for (index, compute_output) in compute_outputs.iter().enumerate() {
+                debug!("Compute output {} has {} states", index, compute_output.states.len());
                 for (animation_id, data) in compute_output.states.iter() {
                     let animation_id = AnimationId::new_from(animation_id.clone());
                     let animation = animation_manager.get_animation(&animation_id);
@@ -95,6 +96,8 @@ impl ThreadedObject for FrameResolver {
                 }
             }
         }
+
+        debug!("Frame Resolver has {} intermediate values", intermediate_data.keys().len());
 
         // TODO: Merge/combine values on the same target by priority / merge rules
         for (target, data) in intermediate_data {
@@ -139,6 +142,7 @@ impl ThreadedObject for FrameResolver {
 
                 let device_id = self.fixture_to_device.get(&fixture_id);
                 if device_id.is_none() {
+                    warn!("Fixture {} is not mapped to a valid device", fixture_id.unprotect());
                     continue;
                 }
 
@@ -146,6 +150,8 @@ impl ThreadedObject for FrameResolver {
                 if let Some(sender) = self.device_buffers.get(device_id) {
                     debug!("Sending frame to {}", device_id);
                     sender.send(fixture_data).ok();
+                } else {
+                    warn!("No data buffer exists for {}", device_id.unprotect())
                 }
             }
         }

@@ -8,7 +8,7 @@
 #![deny(clippy::print_stdout)]
 #![deny(clippy::cast_lossless)]
 
-use std::{fs, path::Path, sync::Arc, thread::{self, JoinHandle, sleep}, time::Duration};
+use std::{fs, path::Path, sync::Arc, thread::{self, JoinHandle, sleep}, time::Duration, collections::HashMap};
 
 use animation::AnimationTargetType;
 use color_eyre::Report;
@@ -18,7 +18,8 @@ use devices::manager::DeviceManager;
 use event_loop::GPUEventLoop;
 use frame_resolver::FrameResolver;
 use futures::executor::block_on;
-use id::{FixtureId, InstallationId, GroupId, DeviceId, AnimationId};
+use id::{FixtureId, InstallationId, GroupId, DeviceId, AnimationId, AuxiliaryId};
+use log::debug;
 use parking_lot::RwLock;
 use pipeline::build_pipeline;
 use state::ThreadedObject;
@@ -78,7 +79,7 @@ async fn main() {
 
     // Applies backpressure to move to next frame in time
     let frame_time_keeper = FrameTimeKeeper::new(frame_rate, u128::from(emblinkenator_config.frame_buffer_size));
-    frame_time_keeper.send_frame_data_to("event_loop".to_string(), event_loop_frame_data_buffer_sender);
+    frame_time_keeper.send_frame_data_to_blocking("event_loop".to_string(), event_loop_frame_data_buffer_sender);
 
     // Create state objects
     let world_context = Arc::new(RwLock::new(WorldContext::new(world_context_collection)));
@@ -110,8 +111,50 @@ async fn main() {
 
     let state = Arc::new(RwLock::new(state));
 
-    // Temp, setup stuff from config
-    {
+    let mut event_loop = GPUEventLoop::new(
+        pipeline,
+        event_loop_frame_data_buffer_receiver,
+        pipeline_context_buffer_receiver,
+        frame_resolver_buffer_sender,
+    );
+
+    let config_frame_resolver = Arc::clone(&frame_resolver);
+    let config_device_manager = Arc::clone(&device_manager);
+    let config_auxiliary_manager = Arc::clone(&auxiliary_manager);
+
+    // Register objects with work loops
+    let threaded_objects: Vec<Arc<RwLock<dyn ThreadedObject>>> =
+        vec![frame_time_keeper, frame_resolver, state, device_manager, auxiliary_manager];
+    let mut handles: Vec<JoinHandle<()>> = vec![];
+
+    // Exists to make Rust compiler happy for now, should probably be linked to a stop button somewhere
+    let running = true;
+
+    for obj in threaded_objects {
+        let handle = thread::spawn(move || 'work: loop {
+            obj.write().tick();
+
+            sleep(Duration::from_millis(1));
+
+            if !running {
+                break 'work;
+            }
+        });
+        handles.push(handle);
+    }
+
+    // TODO: Remove this once event_loop is no longer async (when polling)
+    handles.push(thread::spawn(move || 'work: loop {
+        block_on(event_loop.tick());
+
+        sleep(Duration::from_millis(1));
+
+        if running {
+            break 'work;
+        }
+    }));
+
+    handles.push(thread::spawn(move || {
         let startup_config_json = fs::read_to_string("startup-config.json").expect("Unable to read startup config file");
         let startup_config: StartupConfig = serde_json::from_str(&startup_config_json).unwrap();
         for fixture in startup_config.fixtures {
@@ -143,57 +186,41 @@ async fn main() {
         }
 
         for startup_device in startup_config.devices {
-            device_manager.write().add_device_from_config(DeviceId::new_from(startup_device.id.clone()), startup_device.config);
+            config_device_manager.write().add_device_from_config(DeviceId::new_from(startup_device.id.clone()), startup_device.config);
         }
 
         for mapping in startup_config.fixtures_to_device {
-            frame_resolver.write().set_fixture_to_device(FixtureId::new_from(mapping.0), DeviceId::new_from(mapping.1));
+            config_frame_resolver.write().set_fixture_to_device(FixtureId::new_from(mapping.0), DeviceId::new_from(mapping.1));
         }
 
+        // This horrible magic number brought to you by the lack of an API / database / migrations system.
+        // We need to wait for the `on_device_added` events to be handled.
+        /*thread::sleep(Duration::from_millis(1000));
+
+        debug!("Adding auxiliaries");
+
+        let auxiliaries = config_auxiliary_manager.read().get_available_auxiliaries();
+        let mut device_to_auxiliary: HashMap<DeviceId, AuxiliaryId> = HashMap::new();
+
+        for aux_id in auxiliaries.iter() {
+            if let Some(device_id) = config_auxiliary_manager.read().hack_get_device_of_auxiliary(aux_id) {
+                device_to_auxiliary.insert(device_id, aux_id.to_owned());
+            } else {
+                panic!("Device does not exist for Auxiliary {}", aux_id);
+            }
+        }
+        
         for (animation_id, device_ids) in startup_config.animation_auxiliary_sources {
+            // Need the resulting Aux Ids
             let animation_id = AnimationId::new_from(animation_id);
             let device_ids: Vec<DeviceId> = device_ids.iter().map(|id| DeviceId::new_from(id.to_string())).collect();
-            auxiliary_manager.write().hack_set_animation_auxiliary_sources_to_device_ids(animation_id, device_ids);
+            let auxiliary_ids: Vec<AuxiliaryId> = device_ids.iter().map(|id| {
+                device_to_auxiliary.get(id).cloned().expect(&format!("Auxiliary does not exist for Device {}", id))
+            }).collect();
+            config_auxiliary_manager.write().set_animation_auxiliary_sources_to(animation_id, auxiliary_ids);
         }
-    }
 
-    let mut event_loop = GPUEventLoop::new(
-        pipeline,
-        event_loop_frame_data_buffer_receiver,
-        pipeline_context_buffer_receiver,
-        frame_resolver_buffer_sender,
-    );
-
-    // Register objects with work loops
-    let threaded_objects: Vec<Arc<RwLock<dyn ThreadedObject>>> =
-        vec![frame_time_keeper, frame_resolver, state, device_manager];
-    let mut handles: Vec<JoinHandle<()>> = vec![];
-
-    // Exists to make Rust compiler happy for now, should probably be linked to a stop button somewhere
-    let running = true;
-
-    for obj in threaded_objects {
-        let handle = thread::spawn(move || 'work: loop {
-            obj.write().tick();
-
-            sleep(Duration::from_millis(1));
-
-            if !running {
-                break 'work;
-            }
-        });
-        handles.push(handle);
-    }
-
-    // TODO: Remove this once event_loop is no longer async (when polling)
-    handles.push(thread::spawn(move || 'work: loop {
-        block_on(event_loop.tick());
-
-        sleep(Duration::from_millis(1));
-
-        if running {
-            break 'work;
-        }
+        debug!("Setup complete");*/
     }));
 
     for handle in handles {

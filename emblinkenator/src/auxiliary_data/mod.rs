@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use log::{error, warn};
+use log::{error, warn, debug};
 use parking_lot::RwLock;
 use tokio::sync::broadcast::{Receiver, channel};
 
@@ -49,7 +49,6 @@ pub enum AuxiliaryDataTypeConsumer {
 
 pub struct AuxiliaryDataManager {
     auxiliary_to_device: RwLock<HashMap<AuxiliaryId, DeviceId>>,
-    device_to_auxiliary: RwLock<HashMap<DeviceId, AuxiliaryId>>,
     animation_auxiliary_sources: RwLock<HashMap<AnimationId, Vec<AuxiliaryId>>>,
     auxiliary_data_buffers: RwLock<HashMap<AuxiliaryId, Receiver<AuxiliaryData>>>,
     auxiliary_data: RwLock<HashMap<AuxiliaryId, AuxiliaryData>>,
@@ -59,11 +58,19 @@ impl AuxiliaryDataManager {
     pub fn new() -> Self {
         AuxiliaryDataManager {
             auxiliary_to_device: RwLock::new(HashMap::new()),
-            device_to_auxiliary: RwLock::new(HashMap::new()),
             animation_auxiliary_sources: RwLock::new(HashMap::new()),
             auxiliary_data_buffers: RwLock::new(HashMap::new()),
             auxiliary_data: RwLock::new(HashMap::new()),
         }
+    }
+
+    pub fn get_available_auxiliaries (&self) -> Vec<AuxiliaryId> {
+        self.auxiliary_to_device.read().keys().cloned().collect()
+    }
+
+    // TODO: Remove
+    pub fn hack_get_device_of_auxiliary(&self, aux_id: &AuxiliaryId) -> Option<DeviceId> {
+        self.auxiliary_to_device.read().get(aux_id).cloned()
     }
 
     pub fn get_auxiliary_data(&self) -> HashMap<AuxiliaryId, AuxiliaryData> {
@@ -80,13 +87,6 @@ impl AuxiliaryDataManager {
         self.animation_auxiliary_sources.write().insert(animation_id, sources);
     }
 
-    pub fn hack_set_animation_auxiliary_sources_to_device_ids(&self, animation_id: AnimationId, sources: Vec<DeviceId>) {
-        let animation_sources: Vec<AuxiliaryId> = sources.iter().map(|device_id| 
-            self.device_to_auxiliary.write().get(device_id).cloned().expect(&format!("Device {} does not exist!", device_id))
-        ).collect();
-        self.set_animation_auxiliary_sources_to(animation_id, animation_sources);
-    }
-
     fn read_aux_data_from(&mut self, auxiliary_id: AuxiliaryId, receiver: Receiver<AuxiliaryData>) {
         self.auxiliary_data_buffers.write().insert(auxiliary_id, receiver);
     }
@@ -97,6 +97,7 @@ impl ThreadedObject for AuxiliaryDataManager {
         for (aux_id, data_buffer) in self.auxiliary_data_buffers.write().iter_mut() {
             match data_buffer.try_recv() {
                 Ok(data) => {
+                    debug!("Received aux data from {}", aux_id);
                     self.auxiliary_data.write().insert(aux_id.clone(), data);
                 }
                 Err(err) => match err {

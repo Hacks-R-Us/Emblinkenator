@@ -1,6 +1,8 @@
+use std::{time::Duration, thread::{self, sleep}};
+
 use log::{error, warn};
-use rumqttc::{AsyncClient, MqttOptions, QoS};
-use tokio::{sync::broadcast::{Receiver, error::TryRecvError}, task};
+use rumqttc::{MqttOptions, QoS, Client};
+use tokio::{sync::broadcast::{Receiver, error::TryRecvError}};
 use serde::Deserialize;
 
 use crate::{id::DeviceId, frame_resolver::LEDFrame};
@@ -37,7 +39,7 @@ impl MQTTSenderConfig {
 pub struct MQTTSender {
     pub id: DeviceId,
     name: String,
-    client: AsyncClient,
+    client: Client,
     topic: String,
     data_buffer_receiver: Option<Receiver<LEDFrame>>
 }
@@ -49,13 +51,16 @@ impl MQTTSender {
         if let Some(credentials) = config.credentials {
             mqttoptions.set_credentials(credentials.0, credentials.1);
         }
-        mqttoptions.set_keep_alive(10);
+        mqttoptions.set_keep_alive(Duration::from_secs(10));
 
-        let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
+        let (client, mut connection) = Client::new(mqttoptions, 10);
 
-        task::spawn(async move {
+        thread::spawn(move || {
             loop {
-                eventloop.poll().await.ok();
+                for (_, _) in connection.iter().enumerate() {
+                    // Poll for the sake of making progress, but we don't care about the result
+                    sleep(Duration::from_millis(1));
+                }
             }
         });
 
@@ -80,13 +85,12 @@ impl LEDOutputDevice for MQTTSender {
                 },
                 Ok(frame) => {
                     let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
-                    pollster::block_on(self.client.publish(
+                    self.client.publish(
                         self.topic.clone(),
                         QoS::ExactlyOnce,
                         true,
                         payload,
-                    ))
-                    .unwrap(); // TODO: This will panic and generally do bad things
+                    ).unwrap(); // TODO: This will panic and generally do bad things
                 }
             }
         }

@@ -4,7 +4,7 @@ use std::{collections::HashMap, convert::TryInto, mem, u64};
 
 use crate::{animation::{Animation, AnimationTargetType}, auxiliary_data::{AuxiliaryData, AuxiliaryDataTypeConsumer, aux_data_to_consumer_type}, frame::FrameData, id::{AnimationId, AuxiliaryId}, led::LED, world::Coord};
 use compute_device::{build_compute_device, EmblinkenatorComputeDevice};
-use log::warn;
+use log::{warn, error};
 
 pub struct EmblinkenatorPipeline {
     state: EmblinkenatorPipelineState,
@@ -61,7 +61,7 @@ enum EmblinkenatorPipelineState {
 #[derive(Debug, PartialEq)]
 pub enum EmblinkenatorPipelineError {
     WrongState(String),
-    TargetDoesNotExist(AnimationId),
+    TargetDoesNotExist(AnimationId, AnimationTargetType),
     NoContext(String),
 }
 
@@ -159,16 +159,20 @@ impl EmblinkenatorPipeline {
 
         if !added_auxiliaries.is_empty() {
             for auxiliary in added_auxiliaries.into_iter() {
-                // TODO: Better error handling, should bundle errors
-                self.add_auxiliary(auxiliary.0, auxiliary.1)?;
+                // self.add_auxiliary(auxiliary.0, auxiliary.1);
             }
             self.load_shaders_to_gpu();
         }
 
         if !added_animations.is_empty() {
             for animation in added_animations.into_iter() {
-                // TODO: Better error handling, should bundle errors
-                self.add_shader(context, animation.0, animation.1)?;
+                if let Err(err) = self.add_shader(context, animation.0, animation.1) {
+                    match err {
+                        EmblinkenatorPipelineError::WrongState(msg) => panic!("Pipeline was in wrong state before frame in add_shader: {}", msg),
+                        EmblinkenatorPipelineError::TargetDoesNotExist(animation_id, target) => warn!("Tried to add animation {} but target {} does not exist. This operation will retry.", animation_id, String::from(target)),
+                        EmblinkenatorPipelineError::NoContext(msg) => error!("Tried to call add_shader before frame but no context was provided: {}", msg),
+                    }
+                }
             }
             self.load_shaders_to_gpu();
         }
@@ -199,6 +203,7 @@ impl EmblinkenatorPipeline {
         if num_leds.is_none() {
             return Err(EmblinkenatorPipelineError::TargetDoesNotExist(
                 animation.id(),
+                animation.target,
             ));
         }
 
@@ -356,7 +361,7 @@ impl EmblinkenatorPipeline {
     pub fn add_auxiliary (&mut self,
         id: AuxiliaryId,
         auxiliary: AuxiliaryData
-    ) -> Result<(), EmblinkenatorPipelineError> {
+    ) {
 
         let auxiliary_buffer = self
             .compute_device
@@ -367,8 +372,6 @@ impl EmblinkenatorPipeline {
         };
 
         self.auxiliary_buffers.insert(id, auxiliary);
-
-        Ok(())
     }
 
     pub fn load_shaders_to_gpu(&self) {

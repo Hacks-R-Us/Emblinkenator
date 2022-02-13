@@ -12,7 +12,7 @@ use self::noise::NoiseAuxiliaryDataDevice;
 #[enum_dispatch]
 pub trait AuxiliaryDataDevice: Send + Sync {
     fn tick(&mut self);
-    fn receive_next_frame_data_buffer(&mut self, buffer: crossbeam::channel::Receiver<FrameData>);
+    fn receive_next_frame_data_buffer(&mut self, buffer: tokio::sync::broadcast::Receiver<FrameData>);
     fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryData>);
 }
 
@@ -28,7 +28,7 @@ pub struct ThreadedAuxiliaryDeviceWrapper {
 }
 
 impl ThreadedAuxiliaryDeviceWrapper {
-    pub fn new(mut device: AuxiliaryDataDeviceType) -> Self {
+    pub fn new(device: AuxiliaryDataDeviceType) -> Self {
         let running: Arc<AtomicBool> = Arc::new(AtomicBool::default());
         running.store(true, Ordering::SeqCst);
 
@@ -59,7 +59,7 @@ impl ThreadedAuxiliaryDeviceWrapper {
             .join().expect("Could not join spawned thread");
     }
 
-    pub fn receive_next_frame_data_buffer(&mut self, buffer: crossbeam::channel::Receiver<FrameData>) {
+    pub fn receive_next_frame_data_buffer(&mut self, buffer: tokio::sync::broadcast::Receiver<FrameData>) {
         self.device.write().receive_next_frame_data_buffer(buffer)
     }
 

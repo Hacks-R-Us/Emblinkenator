@@ -62,3 +62,13 @@ impl Default for ShadersConfig {
         Self { shader_folders: vec!["shaders".to_string()] }
     }
 }
+
+impl From<AnimationTargetType> for String {
+    fn from(target: AnimationTargetType) -> Self {
+        match target {
+            AnimationTargetType::Fixture(fixture_id) => fixture_id.unprotect(),
+            AnimationTargetType::Installation(installation_id) => installation_id.unprotect(),
+            AnimationTargetType::Group(group_id) => group_id.unprotect(),
+        }
+    }
+}

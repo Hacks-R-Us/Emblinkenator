@@ -1,7 +1,7 @@
 pub mod mqtt;
 pub mod udp;
 
-use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::{JoinHandle, self, sleep}, time::Duration};
+use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, time::Duration, thread::{JoinHandle, self, sleep}};
 
 use enum_dispatch::enum_dispatch;
 use parking_lot::RwLock;
@@ -30,7 +30,7 @@ pub struct ThreadedLEDOutputDeviceWrapper {
 }
 
 impl ThreadedLEDOutputDeviceWrapper {
-    pub fn new(mut device: LEDDataOutputDeviceType) -> Self {
+    pub fn new(device: LEDDataOutputDeviceType) -> Self {
         let running: Arc<AtomicBool> = Arc::new(AtomicBool::default());
         running.store(true, Ordering::SeqCst);
 
