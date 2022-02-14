@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crossbeam::channel::Sender;
-use log::debug;
+use log::{debug, info};
 use parking_lot::RwLock;
 
 use crate::{
@@ -78,7 +78,13 @@ impl ThreadedObject for EmblinkenatorState {
             }
 
             {
-                let animations = self.animation_manager.read().get_animation_states();
+                let mut animations = self.animation_manager.read().get_animation_states();
+                // We must only report animations that are valid for creation
+                // i.e. Ones where the number of LEDs of the target are known
+                animations.retain(|_, animation| {
+                    let target: String = animation.get_target_type().into();
+                    pipeline_context.num_leds.get(&target).is_some()
+                });
                 pipeline_context.animations = animations;
             }
 

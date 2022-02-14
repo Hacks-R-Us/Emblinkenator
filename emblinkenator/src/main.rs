@@ -195,7 +195,7 @@ async fn main() {
 
         // This horrible magic number brought to you by the lack of an API / database / migrations system.
         // We need to wait for the `on_device_added` events to be handled.
-        /*thread::sleep(Duration::from_millis(1000));
+        thread::sleep(Duration::from_millis(1000));
 
         debug!("Adding auxiliaries");
 
@@ -215,12 +215,12 @@ async fn main() {
             let animation_id = AnimationId::new_from(animation_id);
             let device_ids: Vec<DeviceId> = device_ids.iter().map(|id| DeviceId::new_from(id.to_string())).collect();
             let auxiliary_ids: Vec<AuxiliaryId> = device_ids.iter().map(|id| {
-                device_to_auxiliary.get(id).cloned().expect(&format!("Auxiliary does not exist for Device {}", id))
+                device_to_auxiliary.get(id).cloned().unwrap_or_else(|| panic!("Auxiliary does not exist for Device {}", id))
             }).collect();
             config_auxiliary_manager.write().set_animation_auxiliary_sources_to(animation_id, auxiliary_ids);
         }
 
-        debug!("Setup complete");*/
+        debug!("Setup complete");
     }));
 
     for handle in handles {

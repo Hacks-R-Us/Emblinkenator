@@ -28,10 +28,10 @@ struct Positions {
 
 [[block]]
 struct NoiseData {
-    noise: [[stride(4)]] array<f32>;
+    noise: vec2<f32>;
     size_x: u32;
     size_y: u32;
-}
+};
 
 [[group(0), binding(0)]]
 var<storage, read> params: FrameData;
@@ -43,9 +43,9 @@ var<storage, read> positions: Positions;
 var<storage, read_write> result: Result;
 
 [[group(2), binding(0)]]
-var<storage, read> noise_data NoiseData;
+var<storage, read> noise_data: NoiseData;
 
-fn get_pos (duration: f32) -> f32 {
+fn get_pos(duration: f32) -> f32 {
     var pos: f32 = ((f32(1.0 / params.frameRate) * params.frame) % duration) / duration;
 
     pos = pos * 2.0;

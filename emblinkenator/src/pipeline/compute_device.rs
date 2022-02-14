@@ -1,7 +1,9 @@
 use std::{borrow::Cow, mem};
 
-use log::info;
+use log::{info, debug};
 use wgpu::util::DeviceExt;
+
+use crate::id::AnimationId;
 
 pub struct EmblinkenatorComputeDevice {
     device: wgpu::Device,
@@ -19,10 +21,10 @@ impl EmblinkenatorComputeDevice {
         }
     }
 
-    pub fn create_shader_module(&self, shader: String) -> wgpu::ShaderModule {
+    pub fn create_shader_module(&self, id: AnimationId, shader: String) -> wgpu::ShaderModule {
         self.device
             .create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: None,
+                label: Some(&id.unprotect()),
                 source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(shader.as_str())),
             })
     }

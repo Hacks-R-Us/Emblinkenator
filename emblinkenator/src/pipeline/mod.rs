@@ -4,7 +4,7 @@ use std::{collections::HashMap, convert::TryInto, mem, u64};
 
 use crate::{animation::{Animation, AnimationTargetType}, auxiliary_data::{AuxiliaryData, AuxiliaryDataTypeConsumer, aux_data_to_consumer_type}, frame::FrameData, id::{AnimationId, AuxiliaryId}, led::LED, world::Coord};
 use compute_device::{build_compute_device, EmblinkenatorComputeDevice};
-use log::{warn, error};
+use log::{warn, error, info, debug};
 
 pub struct EmblinkenatorPipeline {
     state: EmblinkenatorPipelineState,
@@ -159,17 +159,18 @@ impl EmblinkenatorPipeline {
 
         if !added_auxiliaries.is_empty() {
             for auxiliary in added_auxiliaries.into_iter() {
-                // self.add_auxiliary(auxiliary.0, auxiliary.1);
+                self.add_auxiliary(auxiliary.0, auxiliary.1);
             }
             self.load_shaders_to_gpu();
         }
 
         if !added_animations.is_empty() {
             for animation in added_animations.into_iter() {
+                info!("Loading animation {}", animation.0);
                 if let Err(err) = self.add_shader(context, animation.0, animation.1) {
                     match err {
                         EmblinkenatorPipelineError::WrongState(msg) => panic!("Pipeline was in wrong state before frame in add_shader: {}", msg),
-                        EmblinkenatorPipelineError::TargetDoesNotExist(animation_id, target) => warn!("Tried to add animation {} but target {} does not exist. This operation will retry.", animation_id, String::from(target)),
+                        EmblinkenatorPipelineError::TargetDoesNotExist(animation_id, target) => panic!("Tried to add animation {} but target {} does not exist.", animation_id, String::from(target)),
                         EmblinkenatorPipelineError::NoContext(msg) => error!("Tried to call add_shader before frame but no context was provided: {}", msg),
                     }
                 }
@@ -214,20 +215,27 @@ impl EmblinkenatorPipeline {
         let work_group_count =
             ((num_leds as f32) / (self.leds_per_compute_group as f32)).ceil() as u32;
 
+        debug!("Create shader module");
         let shader = self
             .compute_device
-            .create_shader_module(animation.get_shader_str());
+            .create_shader_module(animation.id(), animation.get_shader_str());
 
+        debug!("Create storage buffer");
         let storage_buffer = self
             .compute_device
             .create_storage_buffer(id.unprotect(), result_size);
+        
+        debug!("Create staging buffer");
         let staging_buffer = self
             .compute_device
             .create_staging_buffer(id.unprotect(), result_size);
+        
+        debug!("Create positions data buffer");
         let positions_data_buffer = self
             .compute_device
             .create_positions_buffer_dest(id.unprotect(), num_leds);
-
+            
+        debug!("Create auxiliaries");
         let auxiliaries = animation.get_auxiliaries();
         let mut auxiliary_bind_group_entries: Vec<wgpu::BindGroupLayoutEntry> = vec![];
 
@@ -240,7 +248,7 @@ impl EmblinkenatorPipeline {
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Storage { read_only: true },
                             has_dynamic_offset: false,
-                            min_binding_size: None
+                            min_binding_size: None,
                         },
                         count: None,
                     }

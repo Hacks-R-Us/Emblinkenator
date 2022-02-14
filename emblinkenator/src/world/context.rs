@@ -104,6 +104,7 @@ impl WorldContext {
             return Err(WorldContextErrorAddFixture::FixtureExists);
         }
 
+        self.on_state_changed();
         self.emit_fixture_added(id);
 
         Ok(())
@@ -117,6 +118,7 @@ impl WorldContext {
             return Err(WorldContextErrorRemoveFixture::FixtureDoesNotExist);
         }
 
+        self.on_state_changed();
         self.emit_fixture_removed(fixture_id.clone());
 
         Ok(())
@@ -145,6 +147,7 @@ impl WorldContext {
             return Err(WorldContextErrorAddInstallation::InstallationExists);
         }
 
+        self.on_state_changed();
         self.emit_installation_added(id);
 
         Ok(())
@@ -164,6 +167,7 @@ impl WorldContext {
             return Err(WorldContextErrorRemoveInstallation::InstallationDoesNotExist);
         }
 
+        self.on_state_changed();
         self.emit_installation_removed(installation_id.clone());
 
         Ok(())
@@ -184,6 +188,7 @@ impl WorldContext {
             return Err(WorldContextErrorAddGroup::GroupExists);
         }
 
+        self.on_state_changed();
         self.emit_group_added(id);
 
         Ok(())
@@ -194,6 +199,7 @@ impl WorldContext {
             return Err(WorldContextErrorRemoveGroup::GroupDoesNotExist);
         }
 
+        self.on_state_changed();
         self.emit_group_removed(group_id.clone());
 
         Ok(())
@@ -217,6 +223,10 @@ impl WorldContext {
 
     pub fn get_registered_groups(&self) -> Vec<GroupId> {
         self.collection.groups.read().keys().map(|f| f.to_owned()).collect()
+    }
+
+    fn on_state_changed(&self) {
+        self.led_position_cache.lock().unwrap().take();
     }
 
     fn emit_fixture_added(&self, id: FixtureId) {
