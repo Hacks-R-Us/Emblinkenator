@@ -2,7 +2,7 @@ mod compute_device;
 
 use std::{collections::HashMap, convert::TryInto, mem, u64};
 
-use crate::{animation::{Animation, AnimationTargetType}, auxiliary_data::{AuxiliaryData, AuxiliaryDataTypeConsumer, aux_data_to_consumer_type}, frame::FrameData, id::{AnimationId, AuxiliaryId}, led::LED, world::Coord};
+use crate::{animation::{Animation, AnimationTargetType}, auxiliary_data::{AuxiliaryData, AuxiliaryDataTypeConsumer, aux_data_to_consumer_type, aux_data_is_compatible, aux_data_consumer_type_is_compatible}, frame::FrameData, id::{AnimationId, AuxiliaryId}, led::LED, world::Coord};
 use compute_device::{build_compute_device, EmblinkenatorComputeDevice};
 use log::{warn, error, info, debug};
 
@@ -44,7 +44,8 @@ struct PipelineEntry {
 
 struct PipelineAuxiliary {
     buffer: wgpu::Buffer,
-    aux_type: AuxiliaryDataTypeConsumer
+    aux_type: AuxiliaryDataTypeConsumer,
+    size: u64
 }
 
 #[derive(Clone, Debug)]
@@ -159,6 +160,7 @@ impl EmblinkenatorPipeline {
 
         if !added_auxiliaries.is_empty() {
             for auxiliary in added_auxiliaries.into_iter() {
+                info!("Adding auxiliary {}", auxiliary.0);
                 self.add_auxiliary(auxiliary.0, auxiliary.1);
             }
             self.load_shaders_to_gpu();
@@ -376,7 +378,8 @@ impl EmblinkenatorPipeline {
             .create_auxiliary_data_buffer_dest(id.unprotect(), auxiliary.size);
         let auxiliary = PipelineAuxiliary {
             buffer: auxiliary_buffer,
-            aux_type: aux_data_to_consumer_type(auxiliary.data)
+            aux_type: aux_data_to_consumer_type(&auxiliary.data),
+            size: auxiliary.size * aux_data_to_consumer_type(&auxiliary.data).mem_size()
         };
 
         self.auxiliary_buffers.insert(id, auxiliary);
@@ -426,10 +429,41 @@ impl EmblinkenatorPipeline {
             let led_positions = context.led_positions.get(&shader.target_id);
 
             if led_positions.is_none() {
+                warn!("Shader {} does not have any LED positions", shader.id);
                 continue;
             }
 
             let mut auxiliary_group_entries: Vec<wgpu::BindGroupEntry> = vec![];
+
+            let required_auxiliaries = shader.auxiliary_types.clone(); // TODO: Can we just reference this property directly?
+            let mapped_auxiliaries = context.animation_auxiliary_data.get(&shader.id).cloned().unwrap_or(vec![]);
+
+            for (index, required_aux) in required_auxiliaries.iter().enumerate() {
+                let mut valid_mapping = false;
+                if let Some(mapped_aux_id) = mapped_auxiliaries.get(index) {
+                    if let Some(aux) = self.auxiliary_buffers.get(mapped_aux_id) {
+                        if aux_data_consumer_type_is_compatible(&aux.aux_type, required_aux) {
+                            valid_mapping = true;
+                            let aux_data_buffer = self.compute_device.create_auxiliary_data_buffer_dest(format!("{}_{}", shader.id, index), aux.size);
+                            command_encoder.copy_buffer_to_buffer(
+                                &aux.buffer,
+                                0,
+                                &aux_data_buffer,
+                                0,
+                                aux.size
+                            )
+                        }
+                    } else {
+                        error!("Aux {} is mapped for shader {} but does not exist in the current context", index, shader.id);
+                    }
+                } else {
+                    warn!("Auxiliary {} is not mapped for shader {}, an empty buffer will be created", index, shader.id);
+                }
+
+                if !valid_mapping {
+                    // Empty buffer
+                }
+            }
 
             if let Some(auxiliaries) = context.animation_auxiliary_data.get(&shader.id) {
                 let mut missing_auxiliaries: Vec<AuxiliaryId> = vec![];
@@ -458,7 +492,7 @@ impl EmblinkenatorPipeline {
 
                 if !missing_auxiliaries.is_empty() {
                     let missing_auxiliaries_str: Vec<String> = missing_auxiliaries.iter().map(|aux_id|aux_id.unprotect()).collect();
-                    warn!("Shader {} is missing {} auxiliaries ({}). Not computing frame data", shader.id.unprotect(), missing_auxiliaries.len(), missing_auxiliaries_str.join(","));
+                    warn!("Shader {} is missing {} auxiliaries ({}).", shader.id.unprotect(), missing_auxiliaries.len(), missing_auxiliaries_str.join(","));
                     continue;
                 }
             }

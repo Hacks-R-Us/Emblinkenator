@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::mem;
 
 use log::{error, warn, debug};
 use parking_lot::RwLock;
@@ -98,6 +99,7 @@ impl ThreadedObject for AuxiliaryDataManager {
             match data_buffer.try_recv() {
                 Ok(data) => {
                     debug!("Received aux data from {}", aux_id);
+                    // TODO: If size has changed, we need to recreate the auxiliary
                     self.auxiliary_data.write().insert(aux_id.clone(), data);
                 }
                 Err(err) => match err {
@@ -146,9 +148,27 @@ impl AuxiliaryData {
     }
 }
 
+impl AuxiliaryDataTypeConsumer {
+    pub fn mem_size(self) -> u64 {
+        match self {
+            AuxiliaryDataTypeConsumer::Empty => 0,
+            AuxiliaryDataTypeConsumer::U32 => mem::size_of::<u32>() as u64,
+            AuxiliaryDataTypeConsumer::F32 => mem::size_of::<f32>() as u64,
+            AuxiliaryDataTypeConsumer::U32Vec => mem::size_of::<u32>() as u64,
+            AuxiliaryDataTypeConsumer::F32Vec => mem::size_of::<f32>() as u64,
+            AuxiliaryDataTypeConsumer::U32Vec2 => mem::size_of::<u32>() as u64,
+            AuxiliaryDataTypeConsumer::F32Vec2 => mem::size_of::<f32>() as u64,
+            AuxiliaryDataTypeConsumer::U32Vec3 => mem::size_of::<u32>() as u64,
+            AuxiliaryDataTypeConsumer::F32Vec3 => mem::size_of::<f32>() as u64,
+            AuxiliaryDataTypeConsumer::U32Vec4 => mem::size_of::<u32>() as u64,
+            AuxiliaryDataTypeConsumer::F32Vec4 => mem::size_of::<f32>() as u64,
+        }
+    }
+}
+
 pub fn aux_data_is_compatible(
-    data: AuxiliaryDataType,
-    consumer: AuxiliaryDataTypeConsumer,
+    data: &AuxiliaryDataType,
+    consumer: &AuxiliaryDataTypeConsumer,
 ) -> bool {
     match consumer {
         AuxiliaryDataTypeConsumer::Empty => matches!(data, AuxiliaryDataType::Empty),
@@ -165,7 +185,15 @@ pub fn aux_data_is_compatible(
     }
 }
 
-pub fn aux_data_to_consumer_type(data: AuxiliaryDataType) -> AuxiliaryDataTypeConsumer {
+pub fn aux_data_consumer_type_is_compatible(
+    consumer_type_a: &AuxiliaryDataTypeConsumer,
+    consumer_type_b: &AuxiliaryDataTypeConsumer
+) -> bool {
+    consumer_type_a == consumer_type_b
+}
+
+// TODO: From/Into
+pub fn aux_data_to_consumer_type(data: &AuxiliaryDataType) -> AuxiliaryDataTypeConsumer {
     match data {
         AuxiliaryDataType::Empty => AuxiliaryDataTypeConsumer::Empty,
         AuxiliaryDataType::U32(_) => AuxiliaryDataTypeConsumer::U32,
