@@ -1,6 +1,6 @@
 use std::{borrow::Cow, mem};
 
-use log::{debug, info};
+use log::{info};
 use wgpu::util::DeviceExt;
 
 use crate::id::AnimationId;

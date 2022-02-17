@@ -62,7 +62,7 @@ impl ThreadedObject for FrameResolver {
             }
         }
 
-        if compute_outputs.len() == 0 {
+        if compute_outputs.is_empty() {
             return
         }
 

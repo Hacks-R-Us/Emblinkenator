@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crossbeam::channel::Sender;
-use log::{debug, info};
+
 use parking_lot::RwLock;
 
 use crate::{
@@ -107,7 +107,7 @@ impl ThreadedObject for EmblinkenatorState {
         for device_manager_message in self.device_manager_events.try_recv() {
             for device in &self.wants_device_state {
                 match &device_manager_message {
-                    DeviceManagerEvent::DeviceAdded(device_id) => device.write().on_device_added(&self, device_id.clone()),
+                    DeviceManagerEvent::DeviceAdded(device_id) => device.write().on_device_added(self, device_id.clone()),
                     DeviceManagerEvent::DeviceRemoved(_) => todo!(),
                 }
             }

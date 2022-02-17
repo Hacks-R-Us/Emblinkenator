@@ -473,7 +473,7 @@ impl EmblinkenatorPipeline {
                 .animation_auxiliary_data
                 .get(&shader.id)
                 .cloned()
-                .unwrap_or(vec![]);
+                .unwrap_or_default();
 
             for (index, required_aux) in required_auxiliaries.iter().enumerate() {
                 let mut valid_mapping = false;
