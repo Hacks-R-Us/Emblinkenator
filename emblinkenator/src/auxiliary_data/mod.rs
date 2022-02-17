@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use log::{error, warn, debug};
+use log::{debug, error, warn};
 use parking_lot::RwLock;
-use tokio::sync::broadcast::{Receiver, channel};
+use tokio::sync::broadcast::{channel, Receiver};
 
 use crate::state::WantsDeviceState;
 use crate::{
@@ -64,7 +64,7 @@ impl AuxiliaryDataManager {
         }
     }
 
-    pub fn get_available_auxiliaries (&self) -> Vec<AuxiliaryId> {
+    pub fn get_available_auxiliaries(&self) -> Vec<AuxiliaryId> {
         self.auxiliary_to_device.read().keys().cloned().collect()
     }
 
@@ -81,14 +81,22 @@ impl AuxiliaryDataManager {
         self.animation_auxiliary_sources.read().clone()
     }
 
-    pub fn set_animation_auxiliary_sources_to(&self, animation_id: AnimationId, sources: Vec<AuxiliaryId>) {
+    pub fn set_animation_auxiliary_sources_to(
+        &self,
+        animation_id: AnimationId,
+        sources: Vec<AuxiliaryId>,
+    ) {
         // TODO: Validate all sources exist
         // TODO: Validate vec is the correct length
-        self.animation_auxiliary_sources.write().insert(animation_id, sources);
+        self.animation_auxiliary_sources
+            .write()
+            .insert(animation_id, sources);
     }
 
     fn read_aux_data_from(&mut self, auxiliary_id: AuxiliaryId, receiver: Receiver<AuxiliaryData>) {
-        self.auxiliary_data_buffers.write().insert(auxiliary_id, receiver);
+        self.auxiliary_data_buffers
+            .write()
+            .insert(auxiliary_id, receiver);
     }
 }
 
@@ -125,7 +133,7 @@ impl WantsDeviceState for AuxiliaryDataManager {
     fn on_device_added(&mut self, state: &crate::state::EmblinkenatorState, device_id: DeviceId) {
         if let Some(device) = state.get_device(&device_id) {
             match &mut *device.write() {
-                crate::devices::manager::ThreadedDeviceType::LEDDataOutput(_) => {}, // Nothing to do
+                crate::devices::manager::ThreadedDeviceType::LEDDataOutput(_) => {} // Nothing to do
                 crate::devices::manager::ThreadedDeviceType::AuxiliaryData(aux_device) => {
                     let aux_id = AuxiliaryId::new();
                     self.auxiliary_to_device
@@ -134,7 +142,7 @@ impl WantsDeviceState for AuxiliaryDataManager {
                     let (sender, receiver) = channel(1);
                     aux_device.send_into_buffer(sender);
                     self.read_aux_data_from(aux_id, receiver);
-                },
+                }
             }
         }
     }
@@ -144,6 +152,10 @@ impl AuxiliaryData {
     pub fn new(data: AuxiliaryDataType, size: u64) -> Self {
         AuxiliaryData { data, size }
     }
+}
+
+impl AuxiliaryDataType {
+    pub fn to_data_buffer(self) -> Vec<u8> {}
 }
 
 pub fn aux_data_is_compatible(

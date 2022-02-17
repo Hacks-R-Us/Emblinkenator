@@ -2,9 +2,16 @@ mod compute_device;
 
 use std::{collections::HashMap, convert::TryInto, mem, u64};
 
-use crate::{animation::{Animation, AnimationTargetType}, auxiliary_data::{AuxiliaryData, AuxiliaryDataTypeConsumer, aux_data_to_consumer_type}, frame::FrameData, id::{AnimationId, AuxiliaryId}, led::LED, world::Coord};
+use crate::{
+    animation::{Animation, AnimationTargetType},
+    auxiliary_data::{aux_data_to_consumer_type, AuxiliaryData, AuxiliaryDataTypeConsumer},
+    frame::FrameData,
+    id::{AnimationId, AuxiliaryId},
+    led::LED,
+    world::Coord,
+};
 use compute_device::{build_compute_device, EmblinkenatorComputeDevice};
-use log::{warn, error, info, debug};
+use log::{debug, error, info, warn};
 
 pub struct EmblinkenatorPipeline {
     state: EmblinkenatorPipelineState,
@@ -44,7 +51,7 @@ struct PipelineEntry {
 
 struct PipelineAuxiliary {
     buffer: wgpu::Buffer,
-    aux_type: AuxiliaryDataTypeConsumer
+    aux_type: AuxiliaryDataTypeConsumer,
 }
 
 #[derive(Clone, Debug)]
@@ -78,7 +85,7 @@ impl PipelineContext {
             led_positions: HashMap::new(),
             animations: HashMap::new(),
             auxiliary_data: HashMap::new(),
-            animation_auxiliary_data: HashMap::new()
+            animation_auxiliary_data: HashMap::new(),
         }
     }
 }
@@ -169,9 +176,21 @@ impl EmblinkenatorPipeline {
                 info!("Loading animation {}", animation.0);
                 if let Err(err) = self.add_shader(context, animation.0, animation.1) {
                     match err {
-                        EmblinkenatorPipelineError::WrongState(msg) => panic!("Pipeline was in wrong state before frame in add_shader: {}", msg),
-                        EmblinkenatorPipelineError::TargetDoesNotExist(animation_id, target) => panic!("Tried to add animation {} but target {} does not exist.", animation_id, String::from(target)),
-                        EmblinkenatorPipelineError::NoContext(msg) => error!("Tried to call add_shader before frame but no context was provided: {}", msg),
+                        EmblinkenatorPipelineError::WrongState(msg) => panic!(
+                            "Pipeline was in wrong state before frame in add_shader: {}",
+                            msg
+                        ),
+                        EmblinkenatorPipelineError::TargetDoesNotExist(animation_id, target) => {
+                            panic!(
+                                "Tried to add animation {} but target {} does not exist.",
+                                animation_id,
+                                String::from(target)
+                            )
+                        }
+                        EmblinkenatorPipelineError::NoContext(msg) => error!(
+                            "Tried to call add_shader before frame but no context was provided: {}",
+                            msg
+                        ),
                     }
                 }
             }
@@ -210,7 +229,8 @@ impl EmblinkenatorPipeline {
 
         let num_leds = *num_leds.unwrap();
 
-        let result_size = 3 * u64::from(num_leds) * std::mem::size_of::<u32>() as wgpu::BufferAddress;
+        let result_size =
+            3 * u64::from(num_leds) * std::mem::size_of::<u32>() as wgpu::BufferAddress;
         let positions_size = ((num_leds * 3) as usize * mem::size_of::<f32>()) as u64;
         let work_group_count =
             ((num_leds as f32) / (self.leds_per_compute_group as f32)).ceil() as u32;
@@ -224,35 +244,33 @@ impl EmblinkenatorPipeline {
         let storage_buffer = self
             .compute_device
             .create_storage_buffer(id.unprotect(), result_size);
-        
+
         debug!("Create staging buffer");
         let staging_buffer = self
             .compute_device
             .create_staging_buffer(id.unprotect(), result_size);
-        
+
         debug!("Create positions data buffer");
         let positions_data_buffer = self
             .compute_device
             .create_positions_buffer_dest(id.unprotect(), num_leds);
-            
+
         debug!("Create auxiliaries");
         let auxiliaries = animation.get_auxiliaries();
         let mut auxiliary_bind_group_entries: Vec<wgpu::BindGroupLayoutEntry> = vec![];
 
         if let Some(auxiliaries) = auxiliaries {
             for _ in auxiliaries.iter() {
-                auxiliary_bind_group_entries.push(
-                    wgpu::BindGroupLayoutEntry {
-                        binding: auxiliary_bind_group_entries.len() as u32,
-                        visibility: wgpu::ShaderStages::COMPUTE,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Storage { read_only: true },
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    }
-                );
+                auxiliary_bind_group_entries.push(wgpu::BindGroupLayoutEntry {
+                    binding: auxiliary_bind_group_entries.len() as u32,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                });
             }
         }
 
@@ -288,9 +306,7 @@ impl EmblinkenatorPipeline {
                 binding: 0,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage {
-                        read_only: false,
-                    },
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(result_size),
                 },
@@ -323,7 +339,7 @@ impl EmblinkenatorPipeline {
         );
         let auxiliary_bind_group_layout = self.compute_device.create_bind_group_layout(
             format!("Auxiliary bund group layout: {}", id.unprotect()).as_str(),
-            &auxiliary_bind_group_entries
+            &auxiliary_bind_group_entries,
         );
         let result_bind_group = self.compute_device.create_bind_group(
             format!("Result bind group: {}", id.unprotect()).as_str(),
@@ -339,7 +355,7 @@ impl EmblinkenatorPipeline {
             id.unprotect(),
             &compute_bind_group_layout,
             &result_bind_group_layout,
-            &auxiliary_bind_group_layout
+            &auxiliary_bind_group_layout,
         );
         let compute_pipeline = self.compute_device.create_shader_compute_pipeline(
             id.unprotect(),
@@ -360,23 +376,19 @@ impl EmblinkenatorPipeline {
             num_leds,
             work_group_count,
             result_size,
-            auxiliary_types: animation.get_auxiliaries().unwrap_or_default()
+            auxiliary_types: animation.get_auxiliaries().unwrap_or_default(),
         });
 
         Ok(())
     }
 
-    pub fn add_auxiliary (&mut self,
-        id: AuxiliaryId,
-        auxiliary: AuxiliaryData
-    ) {
-
+    pub fn add_auxiliary(&mut self, id: AuxiliaryId, auxiliary: AuxiliaryData) {
         let auxiliary_buffer = self
             .compute_device
             .create_auxiliary_data_buffer_dest(id.unprotect(), auxiliary.size);
         let auxiliary = PipelineAuxiliary {
             buffer: auxiliary_buffer,
-            aux_type: aux_data_to_consumer_type(auxiliary.data)
+            aux_type: aux_data_to_consumer_type(auxiliary.data),
         };
 
         self.auxiliary_buffers.insert(id, auxiliary);
@@ -422,6 +434,24 @@ impl EmblinkenatorPipeline {
             (new_frame_data_vec.len() * mem::size_of::<f32>()) as u64,
         );
 
+        // Copy auxiliary data
+        for (auxiliary_id, auxiliary) in context.auxiliary_data.iter() {
+            if let Some(aux_data_dest) = self.auxiliary_buffers.get(auxiliary_id) {
+                let new_aux_data = auxiliary.data.to_data_buffer();
+                let aux_data_src = self
+                    .compute_device
+                    .create_auxiliary_data_buffer_src(auxiliary_id.unprotect(), &new_aux_data);
+
+                command_encoder.copy_buffer_to_buffer(
+                    &aux_data_src,
+                    0,
+                    &aux_data_dest.buffer,
+                    0,
+                    (new_aux_data.len() * mem::size_of::<u8>()) as u64,
+                )
+            }
+        }
+
         for shader in &self.compute_shaders {
             let led_positions = context.led_positions.get(&shader.target_id);
 
@@ -432,7 +462,6 @@ impl EmblinkenatorPipeline {
             let mut auxiliary_group_entries: Vec<wgpu::BindGroupEntry> = vec![];
 
             if let Some(auxiliaries) = context.animation_auxiliary_data.get(&shader.id) {
-                let mut missing_auxiliaries: Vec<AuxiliaryId> = vec![];
                 for (index, auxiliary_id) in auxiliaries.iter().enumerate() {
                     let aux = self.auxiliary_buffers.get(auxiliary_id);
                     if aux.is_none() {
@@ -448,18 +477,10 @@ impl EmblinkenatorPipeline {
                         }
                     }
 
-                    auxiliary_group_entries.push(
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: aux.buffer.as_entire_binding(),
-                        }
-                    )
-                }
-
-                if !missing_auxiliaries.is_empty() {
-                    let missing_auxiliaries_str: Vec<String> = missing_auxiliaries.iter().map(|aux_id|aux_id.unprotect()).collect();
-                    warn!("Shader {} is missing {} auxiliaries ({}). Not computing frame data", shader.id.unprotect(), missing_auxiliaries.len(), missing_auxiliaries_str.join(","));
-                    continue;
+                    auxiliary_group_entries.push(wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: aux.buffer.as_entire_binding(),
+                    })
                 }
             }
 
@@ -497,8 +518,9 @@ impl EmblinkenatorPipeline {
                 (led_positions_flat.len() * mem::size_of::<f32>()) as u64,
             );
 
-            command_encoder
-                .push_debug_group(format!("Compute pattern state {}", shader.id.unprotect()).as_str());
+            command_encoder.push_debug_group(
+                format!("Compute pattern state {}", shader.id.unprotect()).as_str(),
+            );
             {
                 // Compute pass
                 let mut cpass = command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
