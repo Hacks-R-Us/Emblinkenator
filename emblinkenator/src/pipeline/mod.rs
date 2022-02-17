@@ -4,7 +4,10 @@ use std::{collections::HashMap, convert::TryInto, mem, u64};
 
 use crate::{
     animation::{Animation, AnimationTargetType},
-    auxiliary_data::{aux_data_to_consumer_type, AuxiliaryData, AuxiliaryDataTypeConsumer},
+    auxiliary_data::{
+        aux_data_consumer_type_is_compatible, aux_data_to_consumer_type, AuxiliaryData,
+        AuxiliaryDataTypeConsumer,
+    },
     frame::FrameData,
     id::{AnimationId, AuxiliaryId},
     led::LED,
@@ -52,7 +55,7 @@ struct PipelineEntry {
 struct PipelineAuxiliary {
     buffer: wgpu::Buffer,
     aux_type: AuxiliaryDataTypeConsumer,
-    size: u64
+    size: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -390,8 +393,8 @@ impl EmblinkenatorPipeline {
             .create_auxiliary_data_buffer_dest(id.unprotect(), auxiliary.size);
         let auxiliary = PipelineAuxiliary {
             buffer: auxiliary_buffer,
-            aux_type: aux_data_to_consumer_type(auxiliary.data),
-            size: auxiliary.size * aux_data_to_consumer_type(&auxiliary.data).mem_size()
+            aux_type: aux_data_to_consumer_type(&auxiliary.data),
+            size: auxiliary.size * aux_data_to_consumer_type(&auxiliary.data).mem_size(),
         };
 
         self.auxiliary_buffers.insert(id, auxiliary);
@@ -466,7 +469,11 @@ impl EmblinkenatorPipeline {
             let mut auxiliary_group_entries: Vec<wgpu::BindGroupEntry> = vec![];
 
             let required_auxiliaries = shader.auxiliary_types.clone(); // TODO: Can we just reference this property directly?
-            let mapped_auxiliaries = context.animation_auxiliary_data.get(&shader.id).cloned().unwrap_or(vec![]);
+            let mapped_auxiliaries = context
+                .animation_auxiliary_data
+                .get(&shader.id)
+                .cloned()
+                .unwrap_or(vec![]);
 
             for (index, required_aux) in required_auxiliaries.iter().enumerate() {
                 let mut valid_mapping = false;
@@ -474,20 +481,27 @@ impl EmblinkenatorPipeline {
                     if let Some(aux) = self.auxiliary_buffers.get(mapped_aux_id) {
                         if aux_data_consumer_type_is_compatible(&aux.aux_type, required_aux) {
                             valid_mapping = true;
-                            let aux_data_buffer = self.compute_device.create_auxiliary_data_buffer_dest(format!("{}_{}", shader.id, index), aux.size);
+                            let aux_data_buffer =
+                                self.compute_device.create_auxiliary_data_buffer_dest(
+                                    format!("{}_{}", shader.id, index),
+                                    aux.size,
+                                );
                             command_encoder.copy_buffer_to_buffer(
                                 &aux.buffer,
                                 0,
                                 &aux_data_buffer,
                                 0,
-                                aux.size
+                                aux.size,
                             )
                         }
                     } else {
                         error!("Aux {} is mapped for shader {} but does not exist in the current context", index, shader.id);
                     }
                 } else {
-                    warn!("Auxiliary {} is not mapped for shader {}, an empty buffer will be created", index, shader.id);
+                    warn!(
+                        "Auxiliary {} is not mapped for shader {}, an empty buffer will be created",
+                        index, shader.id
+                    );
                 }
 
                 if !valid_mapping {
@@ -499,14 +513,14 @@ impl EmblinkenatorPipeline {
                 for (index, auxiliary_id) in auxiliaries.iter().enumerate() {
                     let aux = self.auxiliary_buffers.get(auxiliary_id);
                     if aux.is_none() {
-                        missing_auxiliaries.push(auxiliary_id.clone());
+                        // missing_auxiliaries.push(auxiliary_id.clone());
                         continue;
                     }
                     let aux = aux.unwrap();
 
                     if let Some(aux_type) = shader.auxiliary_types.get(index) {
                         if *aux_type != aux.aux_type {
-                            missing_auxiliaries.push(auxiliary_id.clone());
+                            // missing_auxiliaries.push(auxiliary_id.clone());
                             continue;
                         }
                     }

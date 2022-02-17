@@ -157,7 +157,9 @@ impl AuxiliaryData {
 }
 
 impl AuxiliaryDataType {
-    pub fn to_data_buffer(self) -> Vec<u8> {}
+    pub fn to_data_buffer(&self) -> Vec<u8> {
+        todo!()
+    }
 }
 
 impl AuxiliaryDataTypeConsumer {
@@ -199,7 +201,7 @@ pub fn aux_data_is_compatible(
 
 pub fn aux_data_consumer_type_is_compatible(
     consumer_type_a: &AuxiliaryDataTypeConsumer,
-    consumer_type_b: &AuxiliaryDataTypeConsumer
+    consumer_type_b: &AuxiliaryDataTypeConsumer,
 ) -> bool {
     consumer_type_a == consumer_type_b
 }
