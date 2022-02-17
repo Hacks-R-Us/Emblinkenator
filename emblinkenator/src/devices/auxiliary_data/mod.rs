@@ -1,6 +1,13 @@
 pub mod noise;
 
-use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::{JoinHandle, self, sleep}, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::{self, sleep, JoinHandle},
+    time::Duration,
+};
 
 use enum_dispatch::enum_dispatch;
 use parking_lot::RwLock;
@@ -12,13 +19,16 @@ use self::noise::NoiseAuxiliaryDataDevice;
 #[enum_dispatch]
 pub trait AuxiliaryDataDevice: Send + Sync {
     fn tick(&mut self);
-    fn receive_next_frame_data_buffer(&mut self, buffer: tokio::sync::broadcast::Receiver<FrameData>);
+    fn receive_next_frame_data_buffer(
+        &mut self,
+        buffer: tokio::sync::broadcast::Receiver<FrameData>,
+    );
     fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryData>);
 }
 
 #[enum_dispatch(AuxiliaryDataDevice)]
 pub enum AuxiliaryDataDeviceType {
-    Noise(NoiseAuxiliaryDataDevice)
+    Noise(NoiseAuxiliaryDataDevice),
 }
 
 pub struct ThreadedAuxiliaryDeviceWrapper {
@@ -48,21 +58,25 @@ impl ThreadedAuxiliaryDeviceWrapper {
         ThreadedAuxiliaryDeviceWrapper {
             running,
             handle,
-            device
+            device,
         }
     }
 
     pub async fn stop(&mut self) {
         self.running.store(false, Ordering::SeqCst);
         self.handle
-            .take().expect("Called stop on non-running thread")
-            .join().expect("Could not join spawned thread");
+            .take()
+            .expect("Called stop on non-running thread")
+            .join()
+            .expect("Could not join spawned thread");
     }
 
-    pub fn receive_next_frame_data_buffer(&mut self, buffer: tokio::sync::broadcast::Receiver<FrameData>) {
+    pub fn receive_next_frame_data_buffer(
+        &mut self,
+        buffer: tokio::sync::broadcast::Receiver<FrameData>,
+    ) {
         self.device.write().receive_next_frame_data_buffer(buffer)
     }
-
 
     pub fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryData>) {
         self.device.write().send_into_buffer(buffer)

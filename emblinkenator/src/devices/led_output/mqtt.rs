@@ -1,11 +1,14 @@
-use std::{time::Duration, thread::{self, sleep}};
+use std::{
+    thread::{self, sleep},
+    time::Duration,
+};
 
 use log::{error, warn};
-use rumqttc::{MqttOptions, QoS, Client};
-use tokio::{sync::broadcast::{Receiver, error::TryRecvError}};
+use rumqttc::{Client, MqttOptions, QoS};
 use serde::Deserialize;
+use tokio::sync::broadcast::{error::TryRecvError, Receiver};
 
-use crate::{id::DeviceId, frame_resolver::LEDFrame};
+use crate::{frame_resolver::LEDFrame, id::DeviceId};
 
 use super::LEDOutputDevice;
 
@@ -41,7 +44,7 @@ pub struct MQTTSender {
     name: String,
     client: Client,
     topic: String,
-    data_buffer_receiver: Option<Receiver<LEDFrame>>
+    data_buffer_receiver: Option<Receiver<LEDFrame>>,
 }
 
 impl MQTTSender {
@@ -69,7 +72,7 @@ impl MQTTSender {
             name: config.name,
             client,
             topic: config.topic,
-            data_buffer_receiver: None
+            data_buffer_receiver: None,
         }
     }
 }
@@ -79,18 +82,22 @@ impl LEDOutputDevice for MQTTSender {
         if let Some(data_buffer_receiver) = &mut self.data_buffer_receiver {
             match data_buffer_receiver.try_recv() {
                 Err(err) => match err {
-                    TryRecvError::Lagged(missed) => warn!("MQTT device lagged by {} frames! (MQTT Device {})", missed, self.id.unprotect()),
-                    TryRecvError::Closed => error!("Data buffer exists but is closed! (MQTT Device {})", self.id.unprotect()), // TODO: Remove buffer
+                    TryRecvError::Lagged(missed) => warn!(
+                        "MQTT device lagged by {} frames! (MQTT Device {})",
+                        missed,
+                        self.id.unprotect()
+                    ),
+                    TryRecvError::Closed => error!(
+                        "Data buffer exists but is closed! (MQTT Device {})",
+                        self.id.unprotect()
+                    ), // TODO: Remove buffer
                     TryRecvError::Empty => {}
                 },
                 Ok(frame) => {
                     let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
-                    self.client.publish(
-                        self.topic.clone(),
-                        QoS::ExactlyOnce,
-                        true,
-                        payload,
-                    ).unwrap(); // TODO: This will panic and generally do bad things
+                    self.client
+                        .publish(self.topic.clone(), QoS::ExactlyOnce, true, payload)
+                        .unwrap(); // TODO: This will panic and generally do bad things
                 }
             }
         }

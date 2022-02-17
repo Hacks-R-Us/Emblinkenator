@@ -2,9 +2,16 @@ use std::{collections::HashMap, sync::Arc};
 
 use log::{debug, warn};
 use parking_lot::RwLock;
-use tokio::sync::broadcast::{Receiver, error::TryRecvError, Sender};
+use tokio::sync::broadcast::{error::TryRecvError, Receiver, Sender};
 
-use crate::{animation::{manager::AnimationManager, AnimationTargetType}, event_loop::PipelineFrameOutput, id::{AnimationId, FixtureId, DeviceId}, led::LED, state::{ThreadedObject, WantsDeviceState}, world::context::WorldContext};
+use crate::{
+    animation::{manager::AnimationManager, AnimationTargetType},
+    event_loop::PipelineFrameOutput,
+    id::{AnimationId, DeviceId, FixtureId},
+    led::LED,
+    state::{ThreadedObject, WantsDeviceState},
+    world::context::WorldContext,
+};
 
 pub type LEDFrame = Vec<LED>;
 
@@ -13,7 +20,7 @@ pub struct FrameResolver {
     animation_manager: Arc<RwLock<AnimationManager>>,
     world_context: Arc<RwLock<WorldContext>>,
     fixture_to_device: HashMap<FixtureId, DeviceId>,
-    device_buffers: HashMap<DeviceId, Sender<LEDFrame>>
+    device_buffers: HashMap<DeviceId, Sender<LEDFrame>>,
 }
 
 struct FrameIntermediate {
@@ -53,25 +60,30 @@ impl ThreadedObject for FrameResolver {
         let message = self.input_data_buffer.try_recv();
         match message {
             Ok(msg) => compute_outputs.push(msg),
-            Err(err) => {
-                match err {
-                    TryRecvError::Lagged(frames) => warn!("Frame resolver lagged by {} frames", frames),
-                    TryRecvError::Closed => panic!("Pipeline message queue closed early"),
-                    TryRecvError::Empty => {}
-                }
-            }
+            Err(err) => match err {
+                TryRecvError::Lagged(frames) => warn!("Frame resolver lagged by {} frames", frames),
+                TryRecvError::Closed => panic!("Pipeline message queue closed early"),
+                TryRecvError::Empty => {}
+            },
         }
 
         if compute_outputs.is_empty() {
-            return
+            return;
         }
 
-        debug!("Frame Resolver received {} compute outputs", compute_outputs.len());
+        debug!(
+            "Frame Resolver received {} compute outputs",
+            compute_outputs.len()
+        );
 
         {
             let animation_manager = self.animation_manager.read();
             for (index, compute_output) in compute_outputs.iter().enumerate() {
-                debug!("Compute output {} has {} states", index, compute_output.states.len());
+                debug!(
+                    "Compute output {} has {} states",
+                    index,
+                    compute_output.states.len()
+                );
                 for (animation_id, data) in compute_output.states.iter() {
                     let animation_id = AnimationId::new_from(animation_id.clone());
                     let animation = animation_manager.get_animation(&animation_id);
@@ -97,7 +109,10 @@ impl ThreadedObject for FrameResolver {
             }
         }
 
-        debug!("Frame Resolver has {} intermediate values", intermediate_data.keys().len());
+        debug!(
+            "Frame Resolver has {} intermediate values",
+            intermediate_data.keys().len()
+        );
 
         // TODO: Merge/combine values on the same target by priority / merge rules
         for (target, data) in intermediate_data {
@@ -142,7 +157,10 @@ impl ThreadedObject for FrameResolver {
 
                 let device_id = self.fixture_to_device.get(&fixture_id);
                 if device_id.is_none() {
-                    warn!("Fixture {} is not mapped to a valid device", fixture_id.unprotect());
+                    warn!(
+                        "Fixture {} is not mapped to a valid device",
+                        fixture_id.unprotect()
+                    );
                     continue;
                 }
 
@@ -166,8 +184,8 @@ impl WantsDeviceState for FrameResolver {
                     let (sender, receiver) = tokio::sync::broadcast::channel(1);
                     led_output_device.receive_data_from(receiver);
                     self.set_device_buffer(device_id, sender);
-                },
-                crate::devices::manager::ThreadedDeviceType::AuxiliaryData(_) => {}, // Nothing to do
+                }
+                crate::devices::manager::ThreadedDeviceType::AuxiliaryData(_) => {} // Nothing to do
             }
         }
     }

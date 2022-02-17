@@ -1,6 +1,5 @@
 #![feature(drain_filter)]
 #![feature(map_try_insert)]
-
 #![deny(clippy::all)]
 #![warn(clippy::perf)]
 #![warn(clippy::complexity)]
@@ -8,29 +7,41 @@
 #![deny(clippy::print_stdout)]
 #![deny(clippy::cast_lossless)]
 
-use std::{fs, path::Path, sync::Arc, thread::{self, JoinHandle, sleep}, time::Duration, collections::HashMap};
+use std::{
+    collections::HashMap,
+    fs,
+    path::Path,
+    sync::Arc,
+    thread::{self, sleep, JoinHandle},
+    time::Duration,
+};
 
 use animation::AnimationTargetType;
 use color_eyre::Report;
 
-use config::{StartupConfig, StartupAnimationTargetType};
+use config::{StartupAnimationTargetType, StartupConfig};
 use devices::manager::DeviceManager;
 use event_loop::GPUEventLoop;
 use frame_resolver::FrameResolver;
 use futures::executor::block_on;
-use id::{FixtureId, InstallationId, GroupId, DeviceId, AnimationId, AuxiliaryId};
+use id::{AnimationId, AuxiliaryId, DeviceId, FixtureId, GroupId, InstallationId};
 use log::debug;
 use parking_lot::RwLock;
 use pipeline::build_pipeline;
 use state::ThreadedObject;
-use world::{Coord, fixture::{Fixture, FixtureProps}};
+use world::{
+    fixture::{Fixture, FixtureProps},
+    Coord,
+};
 
-use crate::{animation::{manager::AnimationManager}, auxiliary_data::AuxiliaryDataManager, frame::FrameTimeKeeper};
-use crate::config::{EmblinkenatorConfig};
-
+use crate::config::EmblinkenatorConfig;
+use crate::{
+    animation::manager::AnimationManager, auxiliary_data::AuxiliaryDataManager,
+    frame::FrameTimeKeeper,
+};
 
 use crate::state::EmblinkenatorState;
-use crate::world::{context::{WorldContext, WorldContextCollection}};
+use crate::world::context::{WorldContext, WorldContextCollection};
 
 #[macro_use]
 extern crate protected_id_derive;
@@ -57,7 +68,11 @@ async fn main() {
 
     if !Path::exists(Path::new("config.json")) {
         let default_config = EmblinkenatorConfig::default();
-        fs::write("config.json", serde_json::to_string(&default_config).unwrap()).expect("Unable to create config file");
+        fs::write(
+            "config.json",
+            serde_json::to_string(&default_config).unwrap(),
+        )
+        .expect("Unable to create config file");
     }
 
     let config_json = fs::read_to_string("config.json").expect("Unable to read config file");
@@ -72,18 +87,27 @@ async fn main() {
         tokio::sync::broadcast::channel(emblinkenator_config.frame_buffer_size() as _);
     let (pipeline_context_buffer_sender, pipeline_context_buffer_receiver) =
         crossbeam::channel::bounded(emblinkenator_config.frame_buffer_size() as _);
-    let (event_loop_frame_data_buffer_sender, event_loop_frame_data_buffer_receiver) = crossbeam::channel::bounded(1);
+    let (event_loop_frame_data_buffer_sender, event_loop_frame_data_buffer_receiver) =
+        crossbeam::channel::bounded(1);
 
     // Collections
     let world_context_collection = WorldContextCollection::new();
 
     // Applies backpressure to move to next frame in time
-    let frame_time_keeper = FrameTimeKeeper::new(frame_rate, u128::from(emblinkenator_config.frame_buffer_size));
-    frame_time_keeper.send_frame_data_to_blocking("event_loop".to_string(), event_loop_frame_data_buffer_sender);
+    let frame_time_keeper = FrameTimeKeeper::new(
+        frame_rate,
+        u128::from(emblinkenator_config.frame_buffer_size),
+    );
+    frame_time_keeper.send_frame_data_to_blocking(
+        "event_loop".to_string(),
+        event_loop_frame_data_buffer_sender,
+    );
 
     // Create state objects
     let world_context = Arc::new(RwLock::new(WorldContext::new(world_context_collection)));
-    let animation_manager = Arc::new(RwLock::new(AnimationManager::new(&emblinkenator_config.shaders)));
+    let animation_manager = Arc::new(RwLock::new(AnimationManager::new(
+        &emblinkenator_config.shaders,
+    )));
     let frame_resolver = FrameResolver::new(
         Arc::clone(&animation_manager),
         Arc::clone(&world_context),
@@ -123,8 +147,13 @@ async fn main() {
     let config_auxiliary_manager = Arc::clone(&auxiliary_manager);
 
     // Register objects with work loops
-    let threaded_objects: Vec<Arc<RwLock<dyn ThreadedObject>>> =
-        vec![frame_time_keeper, frame_resolver, state, device_manager, auxiliary_manager];
+    let threaded_objects: Vec<Arc<RwLock<dyn ThreadedObject>>> = vec![
+        frame_time_keeper,
+        frame_resolver,
+        state,
+        device_manager,
+        auxiliary_manager,
+    ];
     let mut handles: Vec<JoinHandle<()>> = vec![];
 
     // Exists to make Rust compiler happy for now, should probably be linked to a stop button somewhere
@@ -155,42 +184,63 @@ async fn main() {
     }));
 
     handles.push(thread::spawn(move || {
-        let startup_config_json = fs::read_to_string("startup-config.json").expect("Unable to read startup config file");
+        let startup_config_json =
+            fs::read_to_string("startup-config.json").expect("Unable to read startup config file");
         let startup_config: StartupConfig = serde_json::from_str(&startup_config_json).unwrap();
         for fixture in startup_config.fixtures {
             let mut positions = match fixture.led_positions {
                 Some(positions) => positions,
-                None => vec![Coord::origin(); fixture.num_leds as usize]
+                None => vec![Coord::origin(); fixture.num_leds as usize],
             };
             if positions.len() != fixture.num_leds as usize {
                 positions = vec![Coord::origin(); fixture.num_leds as usize]
             }
-            world_context.write().add_fixture(
-                Fixture::new(
+            world_context
+                .write()
+                .add_fixture(Fixture::new(
                     FixtureId::new_from(fixture.id),
                     FixtureProps {
                         num_leds: fixture.num_leds,
-                        led_positions: positions
-                    }
-                )
-            ).unwrap();
+                        led_positions: positions,
+                    },
+                ))
+                .unwrap();
         }
 
         for animation in startup_config.animations {
             let target = match animation.target_id {
-                StartupAnimationTargetType::Fixture(id) => AnimationTargetType::Fixture(FixtureId::new_from(id)),
-                StartupAnimationTargetType::Installation(id) => AnimationTargetType::Installation(InstallationId::new_from(id)),
-                StartupAnimationTargetType::Group(id) => AnimationTargetType::Group(GroupId::new_from(id)),
+                StartupAnimationTargetType::Fixture(id) => {
+                    AnimationTargetType::Fixture(FixtureId::new_from(id))
+                }
+                StartupAnimationTargetType::Installation(id) => {
+                    AnimationTargetType::Installation(InstallationId::new_from(id))
+                }
+                StartupAnimationTargetType::Group(id) => {
+                    AnimationTargetType::Group(GroupId::new_from(id))
+                }
             };
-            animation_manager.write().create_animation(AnimationId::new_from(animation.id), animation.shader_id, target).unwrap();
+            animation_manager
+                .write()
+                .create_animation(
+                    AnimationId::new_from(animation.id),
+                    animation.shader_id,
+                    target,
+                )
+                .unwrap();
         }
 
         for startup_device in startup_config.devices {
-            config_device_manager.write().add_device_from_config(DeviceId::new_from(startup_device.id.clone()), startup_device.config);
+            config_device_manager.write().add_device_from_config(
+                DeviceId::new_from(startup_device.id.clone()),
+                startup_device.config,
+            );
         }
 
         for mapping in startup_config.fixtures_to_device {
-            config_frame_resolver.write().set_fixture_to_device(FixtureId::new_from(mapping.0), DeviceId::new_from(mapping.1));
+            config_frame_resolver.write().set_fixture_to_device(
+                FixtureId::new_from(mapping.0),
+                DeviceId::new_from(mapping.1),
+            );
         }
 
         // This horrible magic number brought to you by the lack of an API / database / migrations system.
@@ -203,21 +253,35 @@ async fn main() {
         let mut device_to_auxiliary: HashMap<DeviceId, AuxiliaryId> = HashMap::new();
 
         for aux_id in auxiliaries.iter() {
-            if let Some(device_id) = config_auxiliary_manager.read().hack_get_device_of_auxiliary(aux_id) {
+            if let Some(device_id) = config_auxiliary_manager
+                .read()
+                .hack_get_device_of_auxiliary(aux_id)
+            {
                 device_to_auxiliary.insert(device_id, aux_id.to_owned());
             } else {
                 panic!("Device does not exist for Auxiliary {}", aux_id);
             }
         }
-        
+
         for (animation_id, device_ids) in startup_config.animation_auxiliary_sources {
             // Need the resulting Aux Ids
             let animation_id = AnimationId::new_from(animation_id);
-            let device_ids: Vec<DeviceId> = device_ids.iter().map(|id| DeviceId::new_from(id.to_string())).collect();
-            let auxiliary_ids: Vec<AuxiliaryId> = device_ids.iter().map(|id| {
-                device_to_auxiliary.get(id).cloned().unwrap_or_else(|| panic!("Auxiliary does not exist for Device {}", id))
-            }).collect();
-            config_auxiliary_manager.write().set_animation_auxiliary_sources_to(animation_id, auxiliary_ids);
+            let device_ids: Vec<DeviceId> = device_ids
+                .iter()
+                .map(|id| DeviceId::new_from(id.to_string()))
+                .collect();
+            let auxiliary_ids: Vec<AuxiliaryId> = device_ids
+                .iter()
+                .map(|id| {
+                    device_to_auxiliary
+                        .get(id)
+                        .cloned()
+                        .unwrap_or_else(|| panic!("Auxiliary does not exist for Device {}", id))
+                })
+                .collect();
+            config_auxiliary_manager
+                .write()
+                .set_animation_auxiliary_sources_to(animation_id, auxiliary_ids);
         }
 
         debug!("Setup complete");

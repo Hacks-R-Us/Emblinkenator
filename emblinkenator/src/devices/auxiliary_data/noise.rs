@@ -1,25 +1,29 @@
 use std::time::Instant;
 
 use log::{debug, warn};
-use serde::Deserialize;
 use noise::NoiseFn;
+use serde::Deserialize;
 
-use crate::{auxiliary_data::{AuxiliaryDataType, AuxiliaryData}, frame::FrameData, id::DeviceId};
+use crate::{
+    auxiliary_data::{AuxiliaryData, AuxiliaryDataType},
+    frame::FrameData,
+    id::DeviceId,
+};
 
 use super::AuxiliaryDataDevice;
 
 #[derive(Debug, Deserialize, Clone)]
 pub enum NoiseType {
-    Perlin
+    Perlin,
 }
 
 pub enum NoiseFunction {
-    Perlin(noise::Perlin)
+    Perlin(noise::Perlin),
 }
 
 #[derive(Deserialize, Clone)]
 pub struct NoiseAuxiliaryConfig {
-    noise_type: NoiseType
+    noise_type: NoiseType,
 }
 
 pub struct NoiseAuxiliaryDataDevice {
@@ -30,22 +34,20 @@ pub struct NoiseAuxiliaryDataDevice {
 }
 
 impl NoiseAuxiliaryDataDevice {
-    pub fn new (id: DeviceId, config: NoiseAuxiliaryConfig) -> Self {
+    pub fn new(id: DeviceId, config: NoiseAuxiliaryConfig) -> Self {
         let noise_function: NoiseFunction = match config.noise_type {
-            NoiseType::Perlin => {
-                NoiseFunction::Perlin(noise::Perlin::new())
-            }
+            NoiseType::Perlin => NoiseFunction::Perlin(noise::Perlin::new()),
         };
 
         NoiseAuxiliaryDataDevice {
             id,
             noise_function,
             next_frame_data_buffer: None,
-            data_output_buffer: None
+            data_output_buffer: None,
         }
     }
 
-    fn get_noise_for_frame (&self, frame_data: FrameData) -> AuxiliaryData {
+    fn get_noise_for_frame(&self, frame_data: FrameData) -> AuxiliaryData {
         let time_point = frame_data.frame / frame_data.frame_rate;
 
         match self.noise_function {
@@ -59,18 +61,25 @@ impl NoiseAuxiliaryDataDevice {
                     for y in 0..10 {
                         let mut z_vec: Vec<f32> = vec![];
                         for z in 0..10 {
-                            z_vec.push(perlin.get([f64::from(x), f64::from(y), f64::from(z), f64::from(time_point)]) as _);
+                            z_vec.push(perlin.get([
+                                f64::from(x),
+                                f64::from(y),
+                                f64::from(z),
+                                f64::from(time_point),
+                            ]) as _);
                         }
                         y_vec.push(z_vec);
                     }
                     res.push(y_vec);
                 }
 
-                let elapsed_time = Instant::now()
-                    .duration_since(start)
-                    .as_millis();
+                let elapsed_time = Instant::now().duration_since(start).as_millis();
 
-                debug!("Calculated {} noise values in {}ms", u64::pow(10, 3), elapsed_time);
+                debug!(
+                    "Calculated {} noise values in {}ms",
+                    u64::pow(10, 3),
+                    elapsed_time
+                );
 
                 AuxiliaryData::new(AuxiliaryDataType::F32Vec3(res), u64::pow(10, 3))
             }
@@ -79,7 +88,10 @@ impl NoiseAuxiliaryDataDevice {
 }
 
 impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
-    fn receive_next_frame_data_buffer(&mut self, buffer: tokio::sync::broadcast::Receiver<FrameData>) {
+    fn receive_next_frame_data_buffer(
+        &mut self,
+        buffer: tokio::sync::broadcast::Receiver<FrameData>,
+    ) {
         self.next_frame_data_buffer.replace(buffer);
     }
 
@@ -90,7 +102,7 @@ impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
     fn tick(&mut self) {
         let next_frame_data_buffer = self.next_frame_data_buffer.as_mut();
         if next_frame_data_buffer.is_none() {
-            return
+            return;
         }
 
         let next_frame_data_buffer = next_frame_data_buffer.unwrap();
@@ -100,16 +112,22 @@ impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
                 if let Some(data_output_buffer) = self.data_output_buffer.as_mut() {
                     data_output_buffer.send(data).ok();
                 }
-            },
+            }
             Err(err) => match err {
-                tokio::sync::broadcast::error::TryRecvError::Empty => {},
+                tokio::sync::broadcast::error::TryRecvError::Empty => {}
                 tokio::sync::broadcast::error::TryRecvError::Closed => {
-                    debug!("Noise auxiliary {} had next frame data buffer closed", self.id.unprotect());
+                    debug!(
+                        "Noise auxiliary {} had next frame data buffer closed",
+                        self.id.unprotect()
+                    );
                     self.next_frame_data_buffer.take();
-                },
-                tokio::sync::broadcast::error::TryRecvError::Lagged(num) => warn!("Noise Auxiliary device {} lagged by {} frames", self.id.unprotect(), num),
+                }
+                tokio::sync::broadcast::error::TryRecvError::Lagged(num) => warn!(
+                    "Noise Auxiliary device {} lagged by {} frames",
+                    self.id.unprotect(),
+                    num
+                ),
             },
         }
     }
-
 }

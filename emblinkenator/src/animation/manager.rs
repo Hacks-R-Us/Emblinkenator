@@ -3,7 +3,10 @@ use std::sync::Mutex;
 
 use crate::id::AnimationId;
 
-use super::{Animation, AnimationTargetType, ShadersConfig, factory::{get_animation_registry, AnimationRegistry}};
+use super::{
+    factory::{get_animation_registry, AnimationRegistry},
+    Animation, AnimationTargetType, ShadersConfig,
+};
 
 pub struct AnimationManager {
     registry: AnimationRegistry,

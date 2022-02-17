@@ -4,7 +4,11 @@ use crossbeam::channel::Receiver;
 use log::debug;
 use tokio::time::Instant;
 
-use crate::{frame::FrameData, led::LED, pipeline::{ComputeOutput, EmblinkenatorPipeline, PipelineContext}};
+use crate::{
+    frame::FrameData,
+    led::LED,
+    pipeline::{ComputeOutput, EmblinkenatorPipeline, PipelineContext},
+};
 
 pub struct GPUEventLoop {
     state: GPUEventLoopState,
@@ -49,7 +53,6 @@ impl GPUEventLoop {
         pipeline_context_buffer: crossbeam::channel::Receiver<PipelineContext>,
         frame_output_buffer: tokio::sync::broadcast::Sender<PipelineFrameOutput>,
     ) -> GPUEventLoop {
-
         GPUEventLoop {
             state: GPUEventLoopState::Paused,
             command_queue: vec![],
@@ -97,7 +100,10 @@ impl GPUEventLoop {
     }
 
     fn loop_step_compute(&mut self) {
-        let frame_data = self.frame_data_buffer.recv().expect("Frame data buffer closed");
+        let frame_data = self
+            .frame_data_buffer
+            .recv()
+            .expect("Frame data buffer closed");
         debug!("Compute Frame {}", frame_data.frame);
 
         self.pipeline.compute_frame(&frame_data).unwrap();

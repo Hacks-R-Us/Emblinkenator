@@ -5,8 +5,14 @@ use crossbeam::channel::Sender;
 use parking_lot::RwLock;
 
 use crate::{
-    animation::manager::AnimationManager, auxiliary_data::AuxiliaryDataManager,
-    frame::FrameTimeKeeper, pipeline::PipelineContext, world::context::WorldContext, devices::manager::{DeviceManager, DeviceManagerEvent, ThreadedDeviceType}, id::DeviceId, frame_resolver::FrameResolver,
+    animation::manager::AnimationManager,
+    auxiliary_data::AuxiliaryDataManager,
+    devices::manager::{DeviceManager, DeviceManagerEvent, ThreadedDeviceType},
+    frame::FrameTimeKeeper,
+    frame_resolver::FrameResolver,
+    id::DeviceId,
+    pipeline::PipelineContext,
+    world::context::WorldContext,
 };
 
 pub struct EmblinkenatorState {
@@ -18,7 +24,7 @@ pub struct EmblinkenatorState {
     world_context: Arc<RwLock<WorldContext>>,
     pipeline_context_subscribers: Vec<crossbeam::channel::Sender<PipelineContext>>,
     wants_device_state: Vec<Arc<RwLock<dyn WantsDeviceState>>>,
-    device_manager_events: crossbeam::channel::Receiver<DeviceManagerEvent>
+    device_manager_events: crossbeam::channel::Receiver<DeviceManagerEvent>,
 }
 
 pub trait ThreadedObject: Sync + Send {
@@ -49,7 +55,7 @@ impl EmblinkenatorState {
             world_context,
             pipeline_context_subscribers: vec![],
             wants_device_state: vec![auxiliary_data_manager, frame_time_keeper, frame_resolver],
-            device_manager_events
+            device_manager_events,
         }
     }
 
@@ -107,7 +113,9 @@ impl ThreadedObject for EmblinkenatorState {
         for device_manager_message in self.device_manager_events.try_recv() {
             for device in &self.wants_device_state {
                 match &device_manager_message {
-                    DeviceManagerEvent::DeviceAdded(device_id) => device.write().on_device_added(self, device_id.clone()),
+                    DeviceManagerEvent::DeviceAdded(device_id) => {
+                        device.write().on_device_added(self, device_id.clone())
+                    }
                     DeviceManagerEvent::DeviceRemoved(_) => todo!(),
                 }
             }

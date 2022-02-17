@@ -47,8 +47,15 @@ impl LEDOutputDevice for UDPSender {
         if let Some(data_buffer_receiver) = &mut self.data_buffer_receiver {
             match data_buffer_receiver.try_recv() {
                 Err(err) => match err {
-                    TryRecvError::Lagged(missed) => warn!("UDP device lagged by {} frames! (UDP Device {})", missed, self.id.unprotect()),
-                    TryRecvError::Closed => error!("Data buffer exists but is closed! (UDP Device {})", self.id.unprotect()), // TODO: Remove buffer
+                    TryRecvError::Lagged(missed) => warn!(
+                        "UDP device lagged by {} frames! (UDP Device {})",
+                        missed,
+                        self.id.unprotect()
+                    ),
+                    TryRecvError::Closed => error!(
+                        "Data buffer exists but is closed! (UDP Device {})",
+                        self.id.unprotect()
+                    ), // TODO: Remove buffer
                     TryRecvError::Empty => {}
                 },
                 Ok(frame) => {

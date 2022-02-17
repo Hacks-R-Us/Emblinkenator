@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{auxiliary_data::AuxiliaryDataTypeConsumer, id::{AnimationId, FixtureId, GroupId, InstallationId}, world::{context::WorldContext, Coord}};
+use crate::{
+    auxiliary_data::AuxiliaryDataTypeConsumer,
+    id::{AnimationId, FixtureId, GroupId, InstallationId},
+    world::{context::WorldContext, Coord},
+};
 
 use self::factory::AnimationManifest;
 
@@ -23,7 +27,7 @@ pub enum AnimationTargetType {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ShadersConfig {
-    shader_folders: Vec<String>
+    shader_folders: Vec<String>,
 }
 
 pub trait AnimationTarget {
@@ -59,7 +63,9 @@ impl Animation {
 
 impl Default for ShadersConfig {
     fn default() -> Self {
-        Self { shader_folders: vec!["shaders".to_string()] }
+        Self {
+            shader_folders: vec!["shaders".to_string()],
+        }
     }
 }
 

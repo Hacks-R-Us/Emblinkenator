@@ -3,7 +3,7 @@ use std::fmt::Display;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
 pub struct FixtureId {
     #[protected_value]
-    id: String
+    id: String,
 }
 
 impl Display for FixtureId {
@@ -15,7 +15,7 @@ impl Display for FixtureId {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
 pub struct InstallationId {
     #[protected_value]
-    id: String
+    id: String,
 }
 
 impl Display for InstallationId {
@@ -27,7 +27,7 @@ impl Display for InstallationId {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
 pub struct GroupId {
     #[protected_value]
-    id: String
+    id: String,
 }
 
 impl Display for GroupId {
@@ -39,7 +39,7 @@ impl Display for GroupId {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
 pub struct AnimationId {
     #[protected_value]
-    id: String
+    id: String,
 }
 
 impl Display for AnimationId {
@@ -51,7 +51,7 @@ impl Display for AnimationId {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
 pub struct DeviceId {
     #[protected_value]
-    id: String
+    id: String,
 }
 
 impl Display for DeviceId {
@@ -63,7 +63,7 @@ impl Display for DeviceId {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, ProtectedId)]
 pub struct AuxiliaryId {
     #[protected_value]
-    id: String
+    id: String,
 }
 
 impl Display for AuxiliaryId {
