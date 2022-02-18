@@ -4,11 +4,7 @@ use log::{debug, warn};
 use noise::NoiseFn;
 use serde::Deserialize;
 
-use crate::{
-    auxiliary_data::{AuxiliaryData, AuxiliaryDataType},
-    frame::FrameData,
-    id::DeviceId,
-};
+use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData, id::DeviceId};
 
 use super::AuxiliaryDataDevice;
 
@@ -30,7 +26,7 @@ pub struct NoiseAuxiliaryDataDevice {
     id: DeviceId,
     noise_function: NoiseFunction,
     next_frame_data_buffer: Option<tokio::sync::broadcast::Receiver<FrameData>>,
-    data_output_buffer: Option<tokio::sync::broadcast::Sender<AuxiliaryData>>,
+    data_output_buffer: Option<tokio::sync::broadcast::Sender<AuxiliaryDataType>>,
 }
 
 impl NoiseAuxiliaryDataDevice {
@@ -47,7 +43,7 @@ impl NoiseAuxiliaryDataDevice {
         }
     }
 
-    fn get_noise_for_frame(&self, frame_data: FrameData) -> AuxiliaryData {
+    fn get_noise_for_frame(&self, frame_data: FrameData) -> AuxiliaryDataType {
         let time_point = frame_data.frame / frame_data.frame_rate;
 
         match self.noise_function {
@@ -81,7 +77,7 @@ impl NoiseAuxiliaryDataDevice {
                     elapsed_time
                 );
 
-                AuxiliaryData::new(AuxiliaryDataType::F32Vec3(res), u64::pow(10, 3))
+                AuxiliaryDataType::F32Vec3(res)
             }
         }
     }
@@ -95,7 +91,7 @@ impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
         self.next_frame_data_buffer.replace(buffer);
     }
 
-    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryData>) {
+    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryDataType>) {
         self.data_output_buffer.replace(buffer);
     }
 

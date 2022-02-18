@@ -15,6 +15,7 @@ use crate::{
 };
 use compute_device::{build_compute_device, EmblinkenatorComputeDevice};
 use log::{debug, error, info, warn};
+use strum::IntoEnumIterator;
 
 pub struct EmblinkenatorPipeline {
     state: EmblinkenatorPipelineState,
@@ -23,6 +24,7 @@ pub struct EmblinkenatorPipeline {
     frame_data_buffer: wgpu::Buffer,
     compute_shaders: Vec<PipelineEntry>,
     auxiliary_buffers: HashMap<AuxiliaryId, PipelineAuxiliary>,
+    empty_auxiliary_buffers: HashMap<AuxiliaryDataTypeConsumer, PipelineAuxiliary>,
     current_context: Option<PipelineContext>,
 }
 
@@ -102,6 +104,22 @@ impl EmblinkenatorPipeline {
         let frame_data_buffer =
             compute_device.create_frame_data_buffer_dest("pipeline".to_string());
 
+        let mut empty_auxiliary_buffers = HashMap::new();
+
+        for aux_type in AuxiliaryDataTypeConsumer::iter() {
+            let empty_buffer_vec = aux_type.empty_buffer();
+            let empty_buffer = compute_device
+                .create_auxiliary_data_buffer_src(aux_type.to_string(), &empty_buffer_vec);
+            empty_auxiliary_buffers.insert(
+                aux_type.clone(),
+                PipelineAuxiliary {
+                    aux_type: aux_type.clone(),
+                    buffer: empty_buffer,
+                    size: (empty_buffer_vec.len() * mem::size_of::<u8>()) as u64,
+                },
+            );
+        }
+
         EmblinkenatorPipeline {
             state: EmblinkenatorPipelineState::Idle,
             leds_per_compute_group,
@@ -109,6 +127,7 @@ impl EmblinkenatorPipeline {
             frame_data_buffer,
             compute_shaders: vec![],
             auxiliary_buffers: HashMap::new(),
+            empty_auxiliary_buffers,
             current_context: None,
         }
     }
@@ -388,13 +407,14 @@ impl EmblinkenatorPipeline {
     }
 
     pub fn add_auxiliary(&mut self, id: AuxiliaryId, auxiliary: AuxiliaryData) {
+        let auxiliary_size = auxiliary.size * aux_data_to_consumer_type(&auxiliary.data).mem_size();
         let auxiliary_buffer = self
             .compute_device
-            .create_auxiliary_data_buffer_dest(id.unprotect(), auxiliary.size);
+            .create_auxiliary_data_buffer_dest(id.unprotect(), auxiliary_size);
         let auxiliary = PipelineAuxiliary {
             buffer: auxiliary_buffer,
             aux_type: aux_data_to_consumer_type(&auxiliary.data),
-            size: auxiliary.size * aux_data_to_consumer_type(&auxiliary.data).mem_size(),
+            size: auxiliary_size,
         };
 
         self.auxiliary_buffers.insert(id, auxiliary);
@@ -474,62 +494,54 @@ impl EmblinkenatorPipeline {
                 .get(&shader.id)
                 .cloned()
                 .unwrap_or_default();
+            let mut invalid_auxiliaries: Vec<(u32, AuxiliaryDataTypeConsumer)> = vec![];
 
             for (index, required_aux) in required_auxiliaries.iter().enumerate() {
-                let mut valid_mapping = false;
-                if let Some(mapped_aux_id) = mapped_auxiliaries.get(index) {
-                    if let Some(aux) = self.auxiliary_buffers.get(mapped_aux_id) {
-                        if aux_data_consumer_type_is_compatible(&aux.aux_type, required_aux) {
-                            valid_mapping = true;
-                            let aux_data_buffer =
-                                self.compute_device.create_auxiliary_data_buffer_dest(
-                                    format!("{}_{}", shader.id, index),
-                                    aux.size,
-                                );
-                            command_encoder.copy_buffer_to_buffer(
-                                &aux.buffer,
-                                0,
-                                &aux_data_buffer,
-                                0,
-                                aux.size,
-                            )
-                        }
-                    } else {
-                        error!("Aux {} is mapped for shader {} but does not exist in the current context", index, shader.id);
-                    }
-                } else {
+                let mapped_aux_id = mapped_auxiliaries.get(index);
+                if mapped_aux_id.is_none() {
                     warn!(
                         "Auxiliary {} is not mapped for shader {}, an empty buffer will be created",
                         index, shader.id
                     );
+                    invalid_auxiliaries.push((index as u32, required_aux.clone()));
+                    continue;
+                }
+                let mapped_aux_id = mapped_aux_id.unwrap();
+
+                let aux = self.auxiliary_buffers.get(mapped_aux_id);
+                if aux.is_none() {
+                    error!("Aux {} is mapped for shader {} but does not exist in the current context, an empty buffer will be used", index, shader.id);
+                    invalid_auxiliaries.push((index as u32, required_aux.clone()));
+                    continue;
+                }
+                let aux = aux.unwrap();
+
+                if !aux_data_consumer_type_is_compatible(&aux.aux_type, required_aux) {
+                    error!("Aux {} is mapped for shader {} but is not the right type, an empty buffer will be used", index, shader.id);
+                    invalid_auxiliaries.push((index as u32, required_aux.clone()));
+                    continue;
                 }
 
-                if !valid_mapping {
-                    // Empty buffer
-                }
+                auxiliary_group_entries.push(wgpu::BindGroupEntry {
+                    binding: index as u32,
+                    resource: aux.buffer.as_entire_binding(),
+                });
             }
 
-            if let Some(auxiliaries) = context.animation_auxiliary_data.get(&shader.id) {
-                for (index, auxiliary_id) in auxiliaries.iter().enumerate() {
-                    let aux = self.auxiliary_buffers.get(auxiliary_id);
-                    if aux.is_none() {
-                        // missing_auxiliaries.push(auxiliary_id.clone());
-                        continue;
-                    }
-                    let aux = aux.unwrap();
-
-                    if let Some(aux_type) = shader.auxiliary_types.get(index) {
-                        if *aux_type != aux.aux_type {
-                            // missing_auxiliaries.push(auxiliary_id.clone());
-                            continue;
-                        }
-                    }
-
-                    auxiliary_group_entries.push(wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: aux.buffer.as_entire_binding(),
-                    })
-                }
+            for (index, missing_auxiliary_type) in invalid_auxiliaries {
+                let empty_auxiliary_buffer = self
+                    .empty_auxiliary_buffers
+                    .get(&missing_auxiliary_type)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Empty buffer should exist for auxilary type {}",
+                            missing_auxiliary_type
+                        )
+                    });
+                auxiliary_group_entries.push(wgpu::BindGroupEntry {
+                    binding: index,
+                    resource: empty_auxiliary_buffer.buffer.as_entire_binding(),
+                })
             }
 
             let auxiliaries_bind_group = self.compute_device.create_bind_group(

@@ -12,7 +12,7 @@ use std::{
 use enum_dispatch::enum_dispatch;
 use parking_lot::RwLock;
 
-use crate::{auxiliary_data::AuxiliaryData, frame::FrameData};
+use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData};
 
 use self::noise::NoiseAuxiliaryDataDevice;
 
@@ -23,7 +23,7 @@ pub trait AuxiliaryDataDevice: Send + Sync {
         &mut self,
         buffer: tokio::sync::broadcast::Receiver<FrameData>,
     );
-    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryData>);
+    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryDataType>);
 }
 
 #[enum_dispatch(AuxiliaryDataDevice)]
@@ -78,7 +78,7 @@ impl ThreadedAuxiliaryDeviceWrapper {
         self.device.write().receive_next_frame_data_buffer(buffer)
     }
 
-    pub fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryData>) {
+    pub fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryDataType>) {
         self.device.write().send_into_buffer(buffer)
     }
 }
