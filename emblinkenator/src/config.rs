@@ -83,7 +83,7 @@ impl Default for EmblinkenatorConfig {
         Self {
             frame_buffer_size: 10,
             frame_rate: 25,
-            leds_per_compute_group: 100,
+            leds_per_compute_group: 64,
             shaders: ShadersConfig::default(),
         }
     }

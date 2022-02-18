@@ -171,7 +171,11 @@ impl AuxiliaryDataType {
             AuxiliaryDataType::Empty => vec![],
             AuxiliaryDataType::U32(val) => val.to_be_bytes().to_vec(),
             AuxiliaryDataType::F32(val) => val.to_be_bytes().to_vec(),
-            AuxiliaryDataType::U32Vec(val) => bytemuck::cast_slice(val).to_vec(),
+            AuxiliaryDataType::U32Vec(val) => vec![
+                (val.len() as u32).to_be_bytes().to_vec(),
+                bytemuck::cast_slice(val).to_vec(),
+            ]
+            .concat(),
             AuxiliaryDataType::F32Vec(val) => bytemuck::cast_slice(val).to_vec(),
             AuxiliaryDataType::U32Vec2(val) => {
                 bytemuck::cast_slice(&val.iter().flatten().cloned().collect::<Vec<u32>>()).to_vec()
@@ -230,28 +234,14 @@ impl AuxiliaryDataType {
             AuxiliaryDataType::F32(_) => 1,
             AuxiliaryDataType::U32Vec(val) => val.len() as u64,
             AuxiliaryDataType::F32Vec(val) => val.len() as u64,
-            AuxiliaryDataType::U32Vec2(val) => {
-                val.iter().flatten().cloned().collect::<Vec<u32>>().len() as u64
+            AuxiliaryDataType::U32Vec2(val) => val.iter().flatten().cloned().count() as u64,
+            AuxiliaryDataType::F32Vec2(val) => val.iter().flatten().cloned().count() as u64,
+            AuxiliaryDataType::U32Vec3(val) => {
+                val.iter().flatten().into_iter().flatten().cloned().count() as u64
             }
-            AuxiliaryDataType::F32Vec2(val) => {
-                val.iter().flatten().cloned().collect::<Vec<f32>>().len() as u64
+            AuxiliaryDataType::F32Vec3(val) => {
+                val.iter().flatten().into_iter().flatten().cloned().count() as u64
             }
-            AuxiliaryDataType::U32Vec3(val) => val
-                .iter()
-                .flatten()
-                .into_iter()
-                .flatten()
-                .cloned()
-                .collect::<Vec<u32>>()
-                .len() as u64,
-            AuxiliaryDataType::F32Vec3(val) => val
-                .iter()
-                .flatten()
-                .into_iter()
-                .flatten()
-                .cloned()
-                .collect::<Vec<f32>>()
-                .len() as u64,
             AuxiliaryDataType::U32Vec4(val) => val
                 .iter()
                 .flatten()
@@ -260,8 +250,7 @@ impl AuxiliaryDataType {
                 .into_iter()
                 .flatten()
                 .cloned()
-                .collect::<Vec<u32>>()
-                .len() as u64,
+                .count() as u64,
             AuxiliaryDataType::F32Vec4(val) => val
                 .iter()
                 .flatten()
@@ -270,8 +259,7 @@ impl AuxiliaryDataType {
                 .into_iter()
                 .flatten()
                 .cloned()
-                .collect::<Vec<f32>>()
-                .len() as u64,
+                .count() as u64,
         }
     }
 }

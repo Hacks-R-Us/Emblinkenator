@@ -28,9 +28,10 @@ struct Positions {
 
 [[block]]
 struct NoiseData {
-    noise: vec2<f32>;
     size_x: u32;
     size_y: u32;
+    size_z: u32;
+    noise: array<f32>;
 };
 
 [[group(0), binding(0)]]
@@ -43,40 +44,24 @@ var<storage, read> positions: Positions;
 var<storage, read_write> result: Result;
 
 [[group(2), binding(0)]]
-var<storage, read> noise_data: NoiseData;
+var<storage, read> noise_data_r: NoiseData;
 
-fn get_pos(duration: f32) -> f32 {
-    var pos: f32 = ((f32(1.0 / params.frameRate) * params.frame) % duration) / duration;
+[[group(2), binding(1)]]
+var<storage, read> noise_data_g: NoiseData;
 
-    pos = pos * 2.0;
+[[group(2), binding(2)]]
+var<storage, read> noise_data_b: NoiseData;
 
-    if (pos > 1.0) {
-        pos = 1.0 - (pos - 1.0);
-    }
-
-    return pos;
-}
-
-[[stage(compute), workgroup_size(100)]]
+[[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var index: u32 = global_id.x;
-    var end: u32 = index + 10u;
-
-    var r_fade_duration: f32 = 10.0;
-    var g_fade_duration: f32 = 3.0;
-    var b_fade_duration: f32 = 2.0;
-
-    var r_pos: f32 = get_pos(r_fade_duration);
-    var g_pos: f32 = get_pos(g_fade_duration);
-    var b_pos: f32 = get_pos(b_fade_duration);
-    var r_max: f32 = 100.0;
-    var g_max: f32 = 150.0;
-    var b_max: f32 = 100.0;
+    var end: u32 = min(index + 64u, arrayLength(&result.leds));
 
     loop {
-        result.leds[index].r = u32(floor(r_pos * r_max));
-        result.leds[index].g = u32(floor(g_pos * g_max));
-        result.leds[index].b = u32(floor(b_pos * b_max));
+        var position: Coord = positions.data[index];
+        result.leds[index].r = noise_data_r.noise;
+        result.leds[index].g = noise_data_g.noise;
+        result.leds[index].b = noise_data_b.noise;
 
         index = index + 1u;
 

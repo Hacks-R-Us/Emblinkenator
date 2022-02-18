@@ -35,10 +35,10 @@ var<storage, read> positions: Positions;
 [[group(1), binding(0)]]
 var<storage, read_write> result: Result;
 
-[[stage(compute), workgroup_size(100)]]
+[[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var index: u32 = global_id.x;
-    var end: u32 = index + 10u;
+    var end: u32 = min(index + 64u, arrayLength(&result.leds));
 
     loop {
         result.leds[index].r = u32(positions.data[index].x);
