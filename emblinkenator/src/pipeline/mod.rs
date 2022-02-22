@@ -115,7 +115,7 @@ impl EmblinkenatorPipeline {
                 PipelineAuxiliary {
                     aux_type: aux_type.clone(),
                     buffer: empty_buffer,
-                    size: (empty_buffer_vec.len() * mem::size_of::<u8>()) as u64,
+                    size: empty_buffer_vec.len() as u64,
                 },
             );
         }
@@ -407,7 +407,8 @@ impl EmblinkenatorPipeline {
     }
 
     pub fn add_auxiliary(&mut self, id: AuxiliaryId, auxiliary: AuxiliaryData) {
-        let auxiliary_size = auxiliary.size * aux_data_to_consumer_type(&auxiliary.data).mem_size();
+        let auxiliary_size =
+            u64::from(auxiliary.size) * aux_data_to_consumer_type(&auxiliary.data).mem_size();
         let auxiliary_buffer = self
             .compute_device
             .create_auxiliary_data_buffer_dest(id.unprotect(), auxiliary_size);

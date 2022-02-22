@@ -1,4 +1,3 @@
-[[block]]
 struct FrameData {
   frame: f32;
   frameRate: f32;
@@ -10,7 +9,6 @@ struct LED {
     b: u32;
 };
 
-[[block]]
 struct Result {
     leds: [[stride(12)]] array<LED>;
 };
@@ -21,12 +19,10 @@ struct Coord {
     z: f32;
 };
 
-[[block]]
 struct Positions {
     data: [[stride(12)]] array<Coord>;
 };
 
-[[block]]
 struct NoiseData {
     size_x: u32;
     size_y: u32;
@@ -57,11 +53,25 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var index: u32 = global_id.x;
     var end: u32 = min(index + 64u, arrayLength(&result.leds));
 
+    // TODO: Feed from AUX
+    var r_max: f32 = 100.0;
+    var g_max: f32 = 150.0;
+    var b_max: f32 = 100.0;
+
     loop {
         var position: Coord = positions.data[index];
-        result.leds[index].r = noise_data_r.noise;
-        result.leds[index].g = noise_data_g.noise;
-        result.leds[index].b = noise_data_b.noise;
+        // TODO: This assumes the vector has at least as many values as there are LEDs.
+        let noise_r: f32 = noise_data_r.noise[u32((position.x * f32(noise_data_r.size_x)) + (position.y * f32(noise_data_r.size_y)) + position.z)];
+        let noise_g: f32 = noise_data_g.noise[u32((position.x * f32(noise_data_g.size_x)) + (position.y * f32(noise_data_g.size_y)) + position.z)];
+        let noise_b: f32 = noise_data_b.noise[u32((position.x * f32(noise_data_b.size_x)) + (position.y * f32(noise_data_b.size_y)) + position.z)];
+
+        let value_r: f32 = noise_r * f32(r_max);
+        let value_g: f32 = noise_g * f32(g_max);
+        let value_b: f32 = noise_b * f32(b_max);
+
+        result.leds[index].r = u32(value_r);
+        result.leds[index].g = u32(value_g);
+        result.leds[index].b = u32(value_b);
 
         index = index + 1u;
 

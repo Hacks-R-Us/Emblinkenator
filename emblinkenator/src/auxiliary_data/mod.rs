@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::fmt::Display;
 use std::mem;
 use strum_macros::EnumIter;
@@ -19,20 +20,352 @@ pub enum AuxiliaryDataType {
     Empty,
     U32(u32),
     F32(f32),
-    U32Vec(Vec<u32>),
-    F32Vec(Vec<f32>),
-    U32Vec2(Vec<Vec<u32>>),
-    F32Vec2(Vec<Vec<f32>>),
-    U32Vec3(Vec<Vec<Vec<u32>>>),
-    F32Vec3(Vec<Vec<Vec<f32>>>),
-    U32Vec4(Vec<Vec<Vec<Vec<u32>>>>),
-    F32Vec4(Vec<Vec<Vec<Vec<f32>>>>),
+    U32Vec(AuxDataU32Vec),
+    F32Vec(AuxDataF32Vec),
+    U32Vec2(AuxDataU32Vec2),
+    F32Vec2(AuxDataF32Vec2),
+    U32Vec3(AuxDataU32Vec3),
+    F32Vec3(AuxDataF32Vec3),
+    U32Vec4(AuxDataU32Vec4),
+    F32Vec4(AuxDataF32Vec4),
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataU32Vec {
+    data: Vec<u32>,
+    size_dimension_1: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataF32Vec {
+    data: Vec<f32>,
+    size_dimension_1: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataU32Vec2 {
+    data: Vec<Vec<u32>>,
+    size_dimension_1: u32,
+    size_dimension_2: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataF32Vec2 {
+    data: Vec<Vec<f32>>,
+    size_dimension_1: u32,
+    size_dimension_2: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataU32Vec3 {
+    data: Vec<Vec<Vec<u32>>>,
+    size_dimension_1: u32,
+    size_dimension_2: u32,
+    size_dimension_3: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataF32Vec3 {
+    data: Vec<Vec<Vec<f32>>>,
+    size_dimension_1: u32,
+    size_dimension_2: u32,
+    size_dimension_3: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataU32Vec4 {
+    data: Vec<Vec<Vec<Vec<u32>>>>,
+    size_dimension_1: u32,
+    size_dimension_2: u32,
+    size_dimension_3: u32,
+    size_dimension_4: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataF32Vec4 {
+    data: Vec<Vec<Vec<Vec<f32>>>>,
+    size_dimension_1: u32,
+    size_dimension_2: u32,
+    size_dimension_3: u32,
+    size_dimension_4: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataU32VecUnchecked {
+    pub data: Vec<u32>,
+    pub size_dimension_1: u32,
+}
+
+impl TryFrom<AuxDataU32VecUnchecked> for AuxDataU32Vec {
+    type Error = AuxDataFromVecError;
+
+    fn try_from(value: AuxDataU32VecUnchecked) -> Result<Self, Self::Error> {
+        if value.data.len() != value.size_dimension_1 as usize {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        Ok(AuxDataU32Vec {
+            data: value.data,
+            size_dimension_1: value.size_dimension_1,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataF32VecUnchecked {
+    pub data: Vec<f32>,
+    pub size_dimension_1: u32,
+}
+
+impl TryFrom<AuxDataF32VecUnchecked> for AuxDataF32Vec {
+    type Error = AuxDataFromVecError;
+
+    fn try_from(value: AuxDataF32VecUnchecked) -> Result<Self, Self::Error> {
+        if value.data.len() != value.size_dimension_1 as usize {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        Ok(AuxDataF32Vec {
+            data: value.data,
+            size_dimension_1: value.size_dimension_1,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataU32Vec2Unchecked {
+    pub data: Vec<Vec<u32>>,
+    pub size_dimension_1: u32,
+    pub size_dimension_2: u32,
+}
+
+impl TryFrom<AuxDataU32Vec2Unchecked> for AuxDataU32Vec2 {
+    type Error = AuxDataFromVecError;
+
+    fn try_from(value: AuxDataU32Vec2Unchecked) -> Result<Self, Self::Error> {
+        if value.data.len() != value.size_dimension_1 as usize {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        if value
+            .data
+            .iter()
+            .any(|d| d.len() != value.size_dimension_2 as usize)
+        {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        Ok(AuxDataU32Vec2 {
+            data: value.data,
+            size_dimension_1: value.size_dimension_1,
+            size_dimension_2: value.size_dimension_2,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataF32Vec2Unchecked {
+    pub data: Vec<Vec<f32>>,
+    pub size_dimension_1: u32,
+    pub size_dimension_2: u32,
+}
+
+impl TryFrom<AuxDataF32Vec2Unchecked> for AuxDataF32Vec2 {
+    type Error = AuxDataFromVecError;
+
+    fn try_from(value: AuxDataF32Vec2Unchecked) -> Result<Self, Self::Error> {
+        if value.data.len() != value.size_dimension_1 as usize {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        if value
+            .data
+            .iter()
+            .any(|d| d.len() != value.size_dimension_2 as usize)
+        {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        Ok(AuxDataF32Vec2 {
+            data: value.data,
+            size_dimension_1: value.size_dimension_1,
+            size_dimension_2: value.size_dimension_2,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataU32Vec3Unchecked {
+    pub data: Vec<Vec<Vec<u32>>>,
+    pub size_dimension_1: u32,
+    pub size_dimension_2: u32,
+    pub size_dimension_3: u32,
+}
+
+impl TryFrom<AuxDataU32Vec3Unchecked> for AuxDataU32Vec3 {
+    type Error = AuxDataFromVecError;
+
+    fn try_from(value: AuxDataU32Vec3Unchecked) -> Result<Self, Self::Error> {
+        if value.data.len() != value.size_dimension_1 as usize {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        for val in value.data.iter() {
+            if val.len() != value.size_dimension_2 as usize {
+                return Result::Err(AuxDataFromVecError::DimensionMismatch);
+            }
+
+            if val
+                .iter()
+                .any(|d| d.len() != value.size_dimension_3 as usize)
+            {
+                return Result::Err(AuxDataFromVecError::DimensionMismatch);
+            }
+        }
+
+        Ok(AuxDataU32Vec3 {
+            data: value.data,
+            size_dimension_1: value.size_dimension_1,
+            size_dimension_2: value.size_dimension_2,
+            size_dimension_3: value.size_dimension_3,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataF32Vec3Unchecked {
+    pub data: Vec<Vec<Vec<f32>>>,
+    pub size_dimension_1: u32,
+    pub size_dimension_2: u32,
+    pub size_dimension_3: u32,
+}
+
+impl TryFrom<AuxDataF32Vec3Unchecked> for AuxDataF32Vec3 {
+    type Error = AuxDataFromVecError;
+
+    fn try_from(value: AuxDataF32Vec3Unchecked) -> Result<Self, Self::Error> {
+        if value.data.len() != value.size_dimension_1 as usize {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        for val in value.data.iter() {
+            if val.len() != value.size_dimension_2 as usize {
+                return Result::Err(AuxDataFromVecError::DimensionMismatch);
+            }
+
+            if val
+                .iter()
+                .any(|d| d.len() != value.size_dimension_3 as usize)
+            {
+                return Result::Err(AuxDataFromVecError::DimensionMismatch);
+            }
+        }
+
+        Ok(AuxDataF32Vec3 {
+            data: value.data,
+            size_dimension_1: value.size_dimension_1,
+            size_dimension_2: value.size_dimension_2,
+            size_dimension_3: value.size_dimension_3,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataU32Vec4Unchecked {
+    pub data: Vec<Vec<Vec<Vec<u32>>>>,
+    pub size_dimension_1: u32,
+    pub size_dimension_2: u32,
+    pub size_dimension_3: u32,
+    pub size_dimension_4: u32,
+}
+
+impl TryFrom<AuxDataU32Vec4Unchecked> for AuxDataU32Vec4 {
+    type Error = AuxDataFromVecError;
+
+    fn try_from(value: AuxDataU32Vec4Unchecked) -> Result<Self, Self::Error> {
+        if value.data.len() != value.size_dimension_1 as usize {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        for val in value.data.iter() {
+            if val.len() != value.size_dimension_2 as usize {
+                return Result::Err(AuxDataFromVecError::DimensionMismatch);
+            }
+
+            for val2 in val.iter() {
+                if val2.len() != value.size_dimension_3 as usize
+                    || val2
+                        .iter()
+                        .any(|d| d.len() != value.size_dimension_4 as usize)
+                {
+                    return Result::Err(AuxDataFromVecError::DimensionMismatch);
+                }
+            }
+        }
+
+        Ok(AuxDataU32Vec4 {
+            data: value.data,
+            size_dimension_1: value.size_dimension_1,
+            size_dimension_2: value.size_dimension_2,
+            size_dimension_3: value.size_dimension_3,
+            size_dimension_4: value.size_dimension_4,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuxDataF32Vec4Unchecked {
+    pub data: Vec<Vec<Vec<Vec<f32>>>>,
+    pub size_dimension_1: u32,
+    pub size_dimension_2: u32,
+    pub size_dimension_3: u32,
+    pub size_dimension_4: u32,
+}
+
+impl TryFrom<AuxDataF32Vec4Unchecked> for AuxDataF32Vec4 {
+    type Error = AuxDataFromVecError;
+
+    fn try_from(value: AuxDataF32Vec4Unchecked) -> Result<Self, Self::Error> {
+        if value.data.len() != value.size_dimension_1 as usize {
+            return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        for val in value.data.iter() {
+            if val.len() != value.size_dimension_2 as usize {
+                return Result::Err(AuxDataFromVecError::DimensionMismatch);
+            }
+
+            for val2 in val.iter() {
+                if val2.len() != value.size_dimension_3 as usize
+                    || val2
+                        .iter()
+                        .any(|d| d.len() != value.size_dimension_4 as usize)
+                {
+                    return Result::Err(AuxDataFromVecError::DimensionMismatch);
+                }
+            }
+        }
+
+        Ok(AuxDataF32Vec4 {
+            data: value.data,
+            size_dimension_1: value.size_dimension_1,
+            size_dimension_2: value.size_dimension_2,
+            size_dimension_3: value.size_dimension_3,
+            size_dimension_4: value.size_dimension_4,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum AuxDataFromVecError {
+    DimensionMismatch,
+    TooBig,
 }
 
 #[derive(Debug, Clone)]
 pub struct AuxiliaryData {
     pub data: AuxiliaryDataType,
-    pub size: u64,
+    pub size: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash, EnumIter)]
@@ -160,7 +493,7 @@ impl WantsDeviceState for AuxiliaryDataManager {
 }
 
 impl AuxiliaryData {
-    pub fn new(data: AuxiliaryDataType, size: u64) -> Self {
+    pub fn new(data: AuxiliaryDataType, size: u32) -> Self {
         AuxiliaryData { data, size }
     }
 }
@@ -172,94 +505,131 @@ impl AuxiliaryDataType {
             AuxiliaryDataType::U32(val) => val.to_be_bytes().to_vec(),
             AuxiliaryDataType::F32(val) => val.to_be_bytes().to_vec(),
             AuxiliaryDataType::U32Vec(val) => vec![
-                (val.len() as u32).to_be_bytes().to_vec(),
-                bytemuck::cast_slice(val).to_vec(),
+                (val.size_dimension_1).to_be_bytes().to_vec(),
+                bytemuck::cast_slice(&val.data).to_vec(),
             ]
             .concat(),
-            AuxiliaryDataType::F32Vec(val) => bytemuck::cast_slice(val).to_vec(),
-            AuxiliaryDataType::U32Vec2(val) => {
-                bytemuck::cast_slice(&val.iter().flatten().cloned().collect::<Vec<u32>>()).to_vec()
-            }
-            AuxiliaryDataType::F32Vec2(val) => {
-                bytemuck::cast_slice(&val.iter().flatten().cloned().collect::<Vec<f32>>()).to_vec()
-            }
-            AuxiliaryDataType::U32Vec3(val) => bytemuck::cast_slice(
-                &val.iter()
-                    .flatten()
-                    .into_iter()
-                    .flatten()
-                    .cloned()
-                    .collect::<Vec<u32>>(),
-            )
-            .to_vec(),
-            AuxiliaryDataType::F32Vec3(val) => bytemuck::cast_slice(
-                &val.iter()
-                    .flatten()
-                    .into_iter()
-                    .flatten()
-                    .cloned()
-                    .collect::<Vec<f32>>(),
-            )
-            .to_vec(),
-            AuxiliaryDataType::U32Vec4(val) => bytemuck::cast_slice(
-                &val.iter()
-                    .flatten()
-                    .into_iter()
-                    .flatten()
-                    .into_iter()
-                    .flatten()
-                    .cloned()
-                    .collect::<Vec<u32>>(),
-            )
-            .to_vec(),
-            AuxiliaryDataType::F32Vec4(val) => bytemuck::cast_slice(
-                &val.iter()
-                    .flatten()
-                    .into_iter()
-                    .flatten()
-                    .into_iter()
-                    .flatten()
-                    .cloned()
-                    .collect::<Vec<f32>>(),
-            )
-            .to_vec(),
+            AuxiliaryDataType::F32Vec(val) => vec![
+                (val.size_dimension_1).to_be_bytes().to_vec(),
+                bytemuck::cast_slice(&val.data).to_vec(),
+            ]
+            .concat(),
+            AuxiliaryDataType::U32Vec2(val) => vec![
+                val.size_dimension_1.to_be_bytes().to_vec(),
+                val.size_dimension_2.to_be_bytes().to_vec(),
+                bytemuck::cast_slice(&val.data.iter().flatten().cloned().collect::<Vec<u32>>())
+                    .to_vec(),
+            ]
+            .concat(),
+            AuxiliaryDataType::F32Vec2(val) => vec![
+                val.size_dimension_1.to_be_bytes().to_vec(),
+                val.size_dimension_2.to_be_bytes().to_vec(),
+                bytemuck::cast_slice(&val.data.iter().flatten().cloned().collect::<Vec<f32>>())
+                    .to_vec(),
+            ]
+            .concat(),
+            AuxiliaryDataType::U32Vec3(val) => vec![
+                val.size_dimension_1.to_be_bytes().to_vec(),
+                val.size_dimension_2.to_be_bytes().to_vec(),
+                val.size_dimension_3.to_be_bytes().to_vec(),
+                bytemuck::cast_slice(
+                    &val.data
+                        .iter()
+                        .flatten()
+                        .into_iter()
+                        .flatten()
+                        .cloned()
+                        .collect::<Vec<u32>>(),
+                )
+                .to_vec(),
+            ]
+            .concat(),
+            AuxiliaryDataType::F32Vec3(val) => vec![
+                val.size_dimension_1.to_be_bytes().to_vec(),
+                val.size_dimension_2.to_be_bytes().to_vec(),
+                val.size_dimension_3.to_be_bytes().to_vec(),
+                bytemuck::cast_slice(
+                    &val.data
+                        .iter()
+                        .flatten()
+                        .into_iter()
+                        .flatten()
+                        .cloned()
+                        .collect::<Vec<f32>>(),
+                )
+                .to_vec(),
+            ]
+            .concat(),
+            AuxiliaryDataType::U32Vec4(val) => vec![
+                val.size_dimension_1.to_be_bytes().to_vec(),
+                val.size_dimension_2.to_be_bytes().to_vec(),
+                val.size_dimension_3.to_be_bytes().to_vec(),
+                val.size_dimension_4.to_be_bytes().to_vec(),
+                bytemuck::cast_slice(
+                    &val.data
+                        .iter()
+                        .flatten()
+                        .into_iter()
+                        .flatten()
+                        .into_iter()
+                        .flatten()
+                        .cloned()
+                        .collect::<Vec<u32>>(),
+                )
+                .to_vec(),
+            ]
+            .concat(),
+            AuxiliaryDataType::F32Vec4(val) => vec![
+                val.size_dimension_1.to_be_bytes().to_vec(),
+                val.size_dimension_2.to_be_bytes().to_vec(),
+                val.size_dimension_3.to_be_bytes().to_vec(),
+                val.size_dimension_4.to_be_bytes().to_vec(),
+                bytemuck::cast_slice(
+                    &val.data
+                        .iter()
+                        .flatten()
+                        .into_iter()
+                        .flatten()
+                        .into_iter()
+                        .flatten()
+                        .cloned()
+                        .collect::<Vec<f32>>(),
+                )
+                .to_vec(),
+            ]
+            .concat(),
         }
     }
 
-    pub fn get_number_of_values(&self) -> u64 {
-        // TODO: There are a lot of unnecessary allocations here
+    pub fn get_number_of_values(&self) -> u32 {
         match self {
             AuxiliaryDataType::Empty => 0,
             AuxiliaryDataType::U32(_) => 1,
             AuxiliaryDataType::F32(_) => 1,
-            AuxiliaryDataType::U32Vec(val) => val.len() as u64,
-            AuxiliaryDataType::F32Vec(val) => val.len() as u64,
-            AuxiliaryDataType::U32Vec2(val) => val.iter().flatten().cloned().count() as u64,
-            AuxiliaryDataType::F32Vec2(val) => val.iter().flatten().cloned().count() as u64,
+            AuxiliaryDataType::U32Vec(val) => val.size_dimension_1 + 1,
+            AuxiliaryDataType::F32Vec(val) => val.size_dimension_1 + 1,
+            AuxiliaryDataType::U32Vec2(val) => val.size_dimension_1 * val.size_dimension_2 + 2,
+            AuxiliaryDataType::F32Vec2(val) => val.size_dimension_1 * val.size_dimension_2 + 2,
             AuxiliaryDataType::U32Vec3(val) => {
-                val.iter().flatten().into_iter().flatten().cloned().count() as u64
+                val.size_dimension_1 * val.size_dimension_2 * val.size_dimension_3 + 3
             }
             AuxiliaryDataType::F32Vec3(val) => {
-                val.iter().flatten().into_iter().flatten().cloned().count() as u64
+                val.size_dimension_1 * val.size_dimension_2 * val.size_dimension_3 + 3
             }
-            AuxiliaryDataType::U32Vec4(val) => val
-                .iter()
-                .flatten()
-                .into_iter()
-                .flatten()
-                .into_iter()
-                .flatten()
-                .cloned()
-                .count() as u64,
-            AuxiliaryDataType::F32Vec4(val) => val
-                .iter()
-                .flatten()
-                .into_iter()
-                .flatten()
-                .into_iter()
-                .flatten()
-                .cloned()
-                .count() as u64,
+            AuxiliaryDataType::U32Vec4(val) => {
+                val.size_dimension_1
+                    * val.size_dimension_2
+                    * val.size_dimension_3
+                    * val.size_dimension_4
+                    + 4
+            }
+            AuxiliaryDataType::F32Vec4(val) => {
+                val.size_dimension_1
+                    * val.size_dimension_2
+                    * val.size_dimension_3
+                    * val.size_dimension_4
+                    + 4
+            }
         }
     }
 }
@@ -286,64 +656,82 @@ impl AuxiliaryDataTypeConsumer {
             AuxiliaryDataTypeConsumer::Empty => vec![],
             AuxiliaryDataTypeConsumer::U32 => 0_u32.to_be_bytes().to_vec(), // Default value: 0
             AuxiliaryDataTypeConsumer::F32 => 0.0_f32.to_be_bytes().to_vec(), // Default value: 0.0
-            AuxiliaryDataTypeConsumer::U32Vec => vec![0_u32.to_be_bytes()]
-                .iter()
-                .flatten()
-                .cloned()
-                .collect(), // size: 0
-            AuxiliaryDataTypeConsumer::F32Vec => vec![0_u32.to_be_bytes()]
-                .iter()
-                .flatten()
-                .cloned()
-                .collect(), // size: 0
-            AuxiliaryDataTypeConsumer::U32Vec2 => vec![0_u32.to_be_bytes(), 0_u32.to_be_bytes()]
-                .iter()
-                .flatten()
-                .cloned()
-                .collect(), // size_0: 0, size_1: 0
-            AuxiliaryDataTypeConsumer::F32Vec2 => vec![0_u32.to_be_bytes(), 0_u32.to_be_bytes()]
-                .iter()
-                .flatten()
-                .cloned()
-                .collect(), // size_0: 0, size_1: 0
-            AuxiliaryDataTypeConsumer::U32Vec3 => vec![
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-            ]
-            .iter()
-            .flatten()
-            .cloned()
-            .collect(), // size_0: 0, size_1: 0, size_2: 0
-            AuxiliaryDataTypeConsumer::F32Vec3 => vec![
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-            ]
-            .iter()
-            .flatten()
-            .cloned()
-            .collect(), // size_0: 0, size_1: 0, size_2: 0
-            AuxiliaryDataTypeConsumer::U32Vec4 => vec![
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-            ]
-            .iter()
-            .flatten()
-            .cloned()
-            .collect(), // size_0: 0, size_1: 0, size_2: 0, size_3: 0
-            AuxiliaryDataTypeConsumer::F32Vec4 => vec![
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-                0_u32.to_be_bytes(),
-            ]
-            .iter()
-            .flatten()
-            .cloned()
-            .collect(), // size_0: 0, size_1: 0, size_2: 0, size_3: 0
+            AuxiliaryDataTypeConsumer::U32Vec => {
+                let empty: Vec<u32> = vec![0]; // Need to pass at least 1 value
+                vec![
+                    0_u32.to_be_bytes().to_vec(), // size: 0
+                    bytemuck::cast_slice(&empty).to_vec(),
+                ]
+                .concat()
+            }
+            AuxiliaryDataTypeConsumer::F32Vec => {
+                let empty: Vec<f32> = vec![0.0];
+                vec![
+                    0_u32.to_be_bytes().to_vec(), // size: 0
+                    bytemuck::cast_slice(&empty).to_vec(),
+                ]
+                .concat()
+            }
+            AuxiliaryDataTypeConsumer::U32Vec2 => {
+                let empty: Vec<u32> = vec![0];
+                vec![
+                    0_u32.to_be_bytes().to_vec(), // size_0: 0
+                    0_u32.to_be_bytes().to_vec(), // size_1: 0
+                    bytemuck::cast_slice(&empty).to_vec(),
+                ]
+                .concat()
+            }
+            AuxiliaryDataTypeConsumer::F32Vec2 => {
+                let empty: Vec<f32> = vec![0.0];
+                vec![
+                    0_u32.to_be_bytes().to_vec(), // size_0: 0
+                    0_u32.to_be_bytes().to_vec(), // size_1: 0
+                    bytemuck::cast_slice(&empty).to_vec(),
+                ]
+                .concat()
+            }
+            AuxiliaryDataTypeConsumer::U32Vec3 => {
+                let empty: Vec<u32> = vec![0];
+                vec![
+                    0_u32.to_be_bytes().to_vec(), // size_0: 0
+                    0_u32.to_be_bytes().to_vec(), // size_1: 0
+                    0_u32.to_be_bytes().to_vec(), // size_2: 0
+                    bytemuck::cast_slice(&empty).to_vec(),
+                ]
+                .concat()
+            }
+            AuxiliaryDataTypeConsumer::F32Vec3 => {
+                let empty: Vec<f32> = vec![0.0];
+                vec![
+                    0_u32.to_be_bytes().to_vec(), // size_0: 0
+                    0_u32.to_be_bytes().to_vec(), // size_1: 0
+                    0_u32.to_be_bytes().to_vec(), // size_2: 0
+                    bytemuck::cast_slice(&empty).to_vec(),
+                ]
+                .concat()
+            }
+            AuxiliaryDataTypeConsumer::U32Vec4 => {
+                let empty: Vec<u32> = vec![0];
+                vec![
+                    0_u32.to_be_bytes().to_vec(), // size_0: 0
+                    0_u32.to_be_bytes().to_vec(), // size_1: 0
+                    0_u32.to_be_bytes().to_vec(), // size_2: 0
+                    0_u32.to_be_bytes().to_vec(), // size_3: 0
+                    bytemuck::cast_slice(&empty).to_vec(),
+                ]
+                .concat()
+            }
+            AuxiliaryDataTypeConsumer::F32Vec4 => {
+                let empty: Vec<f32> = vec![0.0];
+                vec![
+                    0_u32.to_be_bytes().to_vec(), // size_0: 0
+                    0_u32.to_be_bytes().to_vec(), // size_1: 0
+                    0_u32.to_be_bytes().to_vec(), // size_2: 0
+                    0_u32.to_be_bytes().to_vec(), // size_3: 0
+                    bytemuck::cast_slice(&empty).to_vec(),
+                ]
+                .concat()
+            }
         }
     }
 }

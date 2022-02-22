@@ -221,6 +221,7 @@ pub async fn build_compute_device() -> EmblinkenatorComputeDevice {
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference,
             compatible_surface: None,
+            force_fallback_adapter: false,
         })
         .await
         .expect("No suitable GPU adapters found on the system!");

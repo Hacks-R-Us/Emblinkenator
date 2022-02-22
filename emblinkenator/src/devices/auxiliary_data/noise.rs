@@ -1,10 +1,14 @@
-use std::time::Instant;
+use std::{convert::TryInto, time::Instant};
 
 use log::{debug, warn};
 use noise::NoiseFn;
 use serde::Deserialize;
 
-use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData, id::DeviceId};
+use crate::{
+    auxiliary_data::{AuxDataF32Vec3, AuxDataF32Vec3Unchecked, AuxiliaryDataType},
+    frame::FrameData,
+    id::DeviceId,
+};
 
 use super::AuxiliaryDataDevice;
 
@@ -77,7 +81,18 @@ impl NoiseAuxiliaryDataDevice {
                     elapsed_time
                 );
 
-                AuxiliaryDataType::F32Vec3(res)
+                let uncheckedData = AuxDataF32Vec3Unchecked {
+                    data: res,
+                    size_dimension_1: 10,
+                    size_dimension_2: 10,
+                    size_dimension_3: 10,
+                };
+
+                AuxiliaryDataType::F32Vec3(
+                    uncheckedData
+                        .try_into()
+                        .expect("Noise data should conform to requirements"),
+                )
             }
         }
     }

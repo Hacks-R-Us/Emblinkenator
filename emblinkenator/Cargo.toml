@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "1.5.0", features = ["full"] }
-wgpu = "0.10.1"
+wgpu = "0.12.0"
 pollster = "0.2.3"
 bytemuck = "1.5.1"
 rumqttc = "0.10.0"

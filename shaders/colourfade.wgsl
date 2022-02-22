@@ -1,4 +1,3 @@
-[[block]]
 struct FrameData {
   frame: f32;
   frameRate: f32;
@@ -10,7 +9,6 @@ struct LED {
     b: u32;
 };
 
-[[block]]
 struct Result {
     leds: [[stride(12)]] array<LED>;
 };
@@ -21,7 +19,6 @@ struct Coord {
     z: f32;
 };
 
-[[block]]
 struct Positions {
     data: [[stride(12)]] array<Coord>;
 };
