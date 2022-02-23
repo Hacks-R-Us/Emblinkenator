@@ -5,7 +5,7 @@ use noise::NoiseFn;
 use serde::Deserialize;
 
 use crate::{
-    auxiliary_data::{AuxDataF32Vec3, AuxDataF32Vec3Unchecked, AuxiliaryDataType},
+    auxiliary_data::{AuxDataF32Vec3Unchecked, AuxiliaryDataType},
     frame::FrameData,
     id::DeviceId,
 };
