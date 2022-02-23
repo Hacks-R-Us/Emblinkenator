@@ -81,7 +81,7 @@ impl NoiseAuxiliaryDataDevice {
                     elapsed_time
                 );
 
-                let uncheckedData = AuxDataF32Vec3Unchecked {
+                let unchecked_data = AuxDataF32Vec3Unchecked {
                     data: res,
                     size_dimension_1: 10,
                     size_dimension_2: 10,
@@ -89,7 +89,7 @@ impl NoiseAuxiliaryDataDevice {
                 };
 
                 AuxiliaryDataType::F32Vec3(
-                    uncheckedData
+                    unchecked_data
                         .try_into()
                         .expect("Noise data should conform to requirements"),
                 )
