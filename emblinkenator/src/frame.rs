@@ -9,7 +9,10 @@ use crate::state::{ThreadedObject, WantsDeviceState};
 #[derive(Clone)]
 pub struct FrameData {
     pub frame: u32,
-    pub frame_rate: u32,
+    pub frame_numerator: u32,
+    pub frame_denominator: u32,
+    pub seconds_elapsed: f32,
+    pub whole_seconds_elapsed: u32,
 }
 
 struct FrameStats {
@@ -25,7 +28,8 @@ pub struct FrameTimeKeeper {
         RwLock<HashMap<String, tokio::sync::broadcast::Sender<FrameData>>>,
     next_frame_data_non_blocking_senders:
         RwLock<HashMap<String, tokio::sync::broadcast::Sender<FrameData>>>,
-    frame_rate: u32,
+    frame_numerator: u32,
+    frame_denominator: u32,
     clock_frame: Interval,
     frame_data: FrameData,
     next_frame_data: FrameData,
@@ -35,9 +39,9 @@ pub struct FrameTimeKeeper {
 }
 
 impl FrameTimeKeeper {
-    pub fn new(frame_rate: u32, frame_buffer_size: u128) -> Self {
-        // TODO: Dodgy!
-        let frame_time: u64 = u64::from(1000 / frame_rate);
+    pub fn new(frame_numerator: u32, frame_denominator: u32, frame_buffer_size: u128) -> Self {
+        // TODO: This will drift
+        let frame_time: u64 = u64::from(frame_numerator / frame_denominator);
         let clock_frame = time::interval(time::Duration::from_millis(frame_time));
 
         FrameTimeKeeper {
@@ -45,10 +49,11 @@ impl FrameTimeKeeper {
             next_frame_data_blocking_senders: RwLock::new(HashMap::new()),
             frame_data_non_blocking_senders: RwLock::new(HashMap::new()),
             next_frame_data_non_blocking_senders: RwLock::new(HashMap::new()),
-            frame_rate,
+            frame_numerator,
+            frame_denominator,
             clock_frame,
-            frame_data: FrameData::new(0, frame_rate),
-            next_frame_data: FrameData::new(1, frame_rate),
+            frame_data: FrameData::new(0, frame_numerator, frame_denominator),
+            next_frame_data: FrameData::new(1, frame_numerator, frame_denominator),
             frame_stats: FrameStats::new(u128::from(frame_time)),
             frame_buffer_size,
             late_time: 0,
@@ -124,7 +129,11 @@ impl ThreadedObject for FrameTimeKeeper {
 
         // TODO: This is where a change to framerate would happen
         self.frame_data = self.next_frame_data.clone();
-        self.next_frame_data = FrameData::new(self.frame_data.frame + 1, self.frame_rate);
+        self.next_frame_data = FrameData::new(
+            self.frame_data.frame + 1,
+            self.frame_numerator,
+            self.frame_denominator,
+        );
 
         self.frame_stats = FrameStats::new(target_frame_time);
 
@@ -166,8 +175,21 @@ impl WantsDeviceState for FrameTimeKeeper {
 }
 
 impl FrameData {
-    pub fn new(frame: u32, frame_rate: u32) -> Self {
-        FrameData { frame, frame_rate }
+    pub fn new(frame: u32, frame_numerator: u32, frame_denominator: u32) -> Self {
+        let seconds_elapsed = get_seconds_elapsed(frame, frame_numerator, frame_denominator);
+        let whole_seconds_elapsed = seconds_elapsed.floor() as u32;
+
+        FrameData {
+            frame,
+            frame_numerator,
+            frame_denominator,
+            seconds_elapsed,
+            whole_seconds_elapsed,
+        }
+    }
+
+    pub fn num_fields() -> usize {
+        5
     }
 }
 
@@ -178,4 +200,13 @@ impl FrameStats {
             target_frame_time,
         }
     }
+}
+
+pub fn get_seconds_elapsed(
+    current_frame: u32,
+    frame_numerator: u32,
+    frame_denominator: u32,
+) -> f32 {
+    // TODO: This will drift
+    current_frame as f32 * (frame_numerator as f32 / frame_denominator as f32)
 }

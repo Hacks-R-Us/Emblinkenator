@@ -1,6 +1,9 @@
 struct FrameData {
-  frame: f32;
-  frameRate: f32;
+    frame: f32;
+    frame_numerator: f32;
+    frame_denominator: f32;
+    seconds_elapsed: f32;
+    whole_seconds_elapsed: f32;
 };
 
 struct LED {

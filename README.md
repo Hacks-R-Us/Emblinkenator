@@ -45,4 +45,4 @@ WebGPU needs a [very recent](https://github.com/gfx-rs/wgpu/issues/1906#issuecom
 
 Logging is controlled by the `RUST_LOG` environment variable. If it is not set, the default is `emblinkenator=info`. Setting this to `emblinkenator=debug` will print debug messages for Emblinkenator only, setting it to `debug` will print debug statements from all linked Rust libraries (you have been warned!).
 
-On first run, the `config.json` file will be generated. In there you can change the framerate (default is 25) and frame buffer size (default is 10).
+On first run, the `config.json` file will be generated. In there you can change the framerate (default is 1000/25) and frame buffer size (default is 10).

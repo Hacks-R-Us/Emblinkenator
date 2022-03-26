@@ -3,7 +3,7 @@ use std::{borrow::Cow, mem};
 use log::info;
 use wgpu::util::DeviceExt;
 
-use crate::id::AnimationId;
+use crate::{frame::FrameData, id::AnimationId};
 
 pub struct EmblinkenatorComputeDevice {
     device: wgpu::Device,
@@ -70,7 +70,7 @@ impl EmblinkenatorComputeDevice {
     pub fn create_frame_data_buffer_dest(&self, id: String) -> wgpu::Buffer {
         self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(format!("Frame Data Buffer Dest: {}", id).as_str()),
-            size: (2 * mem::size_of::<f32>()) as _, // TODO: 2 should be number of frame fields.
+            size: (FrameData::num_fields() * mem::size_of::<f32>()) as _,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         })

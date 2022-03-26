@@ -48,7 +48,8 @@ impl NoiseAuxiliaryDataDevice {
     }
 
     fn get_noise_for_frame(&self, frame_data: FrameData) -> AuxiliaryDataType {
-        let time_point = frame_data.frame / frame_data.frame_rate;
+        // TODO: Allow rate to change (samples per second)
+        let time_point = frame_data.whole_seconds_elapsed;
 
         match self.noise_function {
             NoiseFunction::Perlin(perlin) => {

@@ -307,7 +307,7 @@ impl EmblinkenatorPipeline {
                     ty: wgpu::BufferBindingType::Storage { read_only: true },
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(
-                        (2 * mem::size_of::<f32>()) as _, // TODO: Replace 2 with something that tracks with API changes
+                        (FrameData::num_fields() * mem::size_of::<f32>()) as _,
                     ),
                 },
                 count: None,
@@ -445,8 +445,14 @@ impl EmblinkenatorPipeline {
 
         let mut command_encoder = self.compute_device.create_compute_command_encoder();
 
-        let new_frame_data_vec: Vec<f32> =
-            [frame_data.frame as f32, frame_data.frame_rate as f32].to_vec();
+        let new_frame_data_vec: Vec<f32> = [
+            frame_data.frame as f32,
+            frame_data.frame_numerator as f32,
+            frame_data.frame_denominator as f32,
+            frame_data.seconds_elapsed,
+            frame_data.whole_seconds_elapsed as f32,
+        ]
+        .to_vec();
 
         let frame_data_buffer = self
             .compute_device

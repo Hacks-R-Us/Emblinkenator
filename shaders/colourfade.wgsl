@@ -1,6 +1,9 @@
 struct FrameData {
-  frame: f32;
-  frameRate: f32;
+    frame: f32;
+    frame_numerator: f32;
+    frame_denominator: f32;
+    seconds_elapsed: f32;
+    whole_seconds_elapsed: f32;
 };
 
 struct LED {
@@ -33,7 +36,7 @@ var<storage, read> positions: Positions;
 var<storage, read_write> result: Result;
 
 fn get_pos (duration: f32) -> f32 {
-    var pos: f32 = ((f32(1.0 / params.frameRate) * params.frame) % duration) / duration;
+    var pos: f32 = (params.seconds_elapsed % duration) / duration;
 
     pos = pos * 2.0;
 

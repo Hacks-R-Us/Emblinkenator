@@ -79,7 +79,8 @@ async fn main() {
     let emblinkenator_config: EmblinkenatorConfig = serde_json::from_str(&config_json).unwrap();
 
     // Setup config
-    let frame_rate = emblinkenator_config.frame_rate();
+    let frame_numerator = emblinkenator_config.frame_numerator();
+    let frame_denominator = emblinkenator_config.frame_denominator();
     let leds_per_compute_group = emblinkenator_config.leds_per_compute_group();
 
     // Create buffers for state transfer
@@ -95,7 +96,8 @@ async fn main() {
 
     // Applies backpressure to move to next frame in time
     let frame_time_keeper = FrameTimeKeeper::new(
-        frame_rate,
+        frame_numerator,
+        frame_denominator,
         u128::from(emblinkenator_config.frame_buffer_size),
     );
     frame_time_keeper.send_frame_data_to_blocking(

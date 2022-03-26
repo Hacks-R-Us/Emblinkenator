@@ -7,7 +7,8 @@ use crate::{animation::ShadersConfig, devices::manager::DeviceConfigType, world:
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmblinkenatorConfig {
     pub frame_buffer_size: u32,
-    pub frame_rate: u32,
+    pub frame_numerator: u32,
+    pub frame_denominator: u32,
     pub leds_per_compute_group: u32,
     pub shaders: ShadersConfig,
 }
@@ -53,13 +54,15 @@ pub enum StartupAnimationTargetType {
 impl EmblinkenatorConfig {
     pub fn new(
         frame_buffer_size: u32,
-        frame_rate: u32,
+        frame_numerator: u32,
+        frame_denominator: u32,
         leds_per_compute_group: u32,
         shaders: ShadersConfig,
     ) -> Self {
         EmblinkenatorConfig {
             frame_buffer_size,
-            frame_rate,
+            frame_numerator,
+            frame_denominator,
             leds_per_compute_group,
             shaders,
         }
@@ -69,8 +72,12 @@ impl EmblinkenatorConfig {
         self.frame_buffer_size
     }
 
-    pub fn frame_rate(&self) -> u32 {
-        self.frame_rate
+    pub fn frame_numerator(&self) -> u32 {
+        self.frame_numerator
+    }
+
+    pub fn frame_denominator(&self) -> u32 {
+        self.frame_denominator
     }
 
     pub fn leds_per_compute_group(&self) -> u32 {
@@ -82,7 +89,8 @@ impl Default for EmblinkenatorConfig {
     fn default() -> Self {
         Self {
             frame_buffer_size: 10,
-            frame_rate: 25,
+            frame_numerator: 1000,
+            frame_denominator: 25,
             leds_per_compute_group: 64,
             shaders: ShadersConfig::default(),
         }
