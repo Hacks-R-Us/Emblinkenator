@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use crossbeam::channel::Receiver;
 use log::debug;
-use tokio::time::Instant;
 
 use crate::{
     frame::FrameData,
@@ -38,7 +37,6 @@ pub enum GPUEventLoopQueue {
 #[derive(Clone)]
 struct EventLoopFrameState {
     pub last_frame_state: Option<ComputeOutput>,
-    pub frame_start: Instant,
 }
 
 #[derive(Debug, Clone)]
@@ -166,7 +164,6 @@ impl EventLoopFrameState {
     fn new() -> Self {
         EventLoopFrameState {
             last_frame_state: None,
-            frame_start: Instant::now(),
         }
     }
 }

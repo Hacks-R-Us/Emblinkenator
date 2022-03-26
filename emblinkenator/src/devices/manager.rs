@@ -190,10 +190,10 @@ impl From<LEDOutputConfigWithId> for LEDDataOutputDeviceType {
 
         match led_device_config {
             LEDOutputConfigType::MQTT(mqtt_device_config) => {
-                LEDDataOutputDeviceType::MQTT(MQTTSender::new(device_id, mqtt_device_config))
+                LEDDataOutputDeviceType::Mqtt(MQTTSender::new(device_id, mqtt_device_config))
             }
             LEDOutputConfigType::UDP(udp_device_config) => {
-                LEDDataOutputDeviceType::UPD(UDPSender::new(device_id, udp_device_config))
+                LEDDataOutputDeviceType::Udp(UDPSender::new(device_id, udp_device_config))
             }
         }
     }

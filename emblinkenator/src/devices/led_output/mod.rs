@@ -26,8 +26,8 @@ pub trait LEDOutputDevice: Send + Sync {
 
 #[enum_dispatch(LEDOutputDevice)]
 pub enum LEDDataOutputDeviceType {
-    MQTT(MQTTSender),
-    UPD(UDPSender),
+    Mqtt(MQTTSender),
+    Udp(UDPSender),
 }
 
 pub struct ThreadedLEDOutputDeviceWrapper {
