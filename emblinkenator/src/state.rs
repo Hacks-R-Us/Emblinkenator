@@ -110,7 +110,7 @@ impl ThreadedObject for EmblinkenatorState {
             pipeline_context_buffer.send(pipeline_context).unwrap();
         }
 
-        for device_manager_message in self.device_manager_events.try_recv() {
+        while let Ok(device_manager_message) = self.device_manager_events.try_recv() {
             for device in &self.wants_device_state {
                 match &device_manager_message {
                     DeviceManagerEvent::DeviceAdded(device_id) => {
