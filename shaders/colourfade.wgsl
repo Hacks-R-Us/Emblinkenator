@@ -4,9 +4,9 @@ struct FrameData {
 };
 
 struct LED {
-    r: u32;
-    g: u32;
-    b: u32;
+    r: f32;
+    g: f32;
+    b: f32;
 };
 
 struct Result {
@@ -56,14 +56,14 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var r_pos: f32 = get_pos(r_fade_duration);
     var g_pos: f32 = get_pos(g_fade_duration);
     var b_pos: f32 = get_pos(b_fade_duration);
-    var r_max: f32 = 100.0;
-    var g_max: f32 = 150.0;
-    var b_max: f32 = 100.0;
+    var r_max: f32 = 1.0;
+    var g_max: f32 = 0.8;
+    var b_max: f32 = 0.5;
 
     loop {
-        result.leds[index].r = u32(floor(r_pos * r_max));
-        result.leds[index].g = u32(floor(g_pos * g_max));
-        result.leds[index].b = u32(floor(b_pos * b_max));
+        result.leds[index].r = r_pos * r_max;
+        result.leds[index].g = g_pos * g_max;
+        result.leds[index].b = b_pos * b_max;
 
         index = index + 1u;
 

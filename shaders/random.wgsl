@@ -4,9 +4,9 @@ struct FrameData {
 };
 
 struct LED {
-    r: u32;
-    g: u32;
-    b: u32;
+    r: f32;
+    g: f32;
+    b: f32;
 };
 
 struct Result {
@@ -30,6 +30,10 @@ struct NoiseData {
     noise: array<f32>;
 };
 
+struct RGBValue {
+    val: f32;
+};
+
 [[group(0), binding(0)]]
 var<storage, read> params: FrameData;
 
@@ -39,24 +43,24 @@ var<storage, read> positions: Positions;
 [[group(1), binding(0)]]
 var<storage, read_write> result: Result;
 
+
 [[group(2), binding(0)]]
-var<storage, read> noise_data_r: NoiseData;
-
+var<storage, read> r_max: RGBValue;
 [[group(2), binding(1)]]
-var<storage, read> noise_data_g: NoiseData;
-
+var<storage, read> g_max: RGBValue;
 [[group(2), binding(2)]]
+var<storage, read> b_max: RGBValue;
+[[group(2), binding(3)]]
+var<storage, read> noise_data_r: NoiseData;
+[[group(2), binding(4)]]
+var<storage, read> noise_data_g: NoiseData;
+[[group(2), binding(5)]]
 var<storage, read> noise_data_b: NoiseData;
 
 [[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var index: u32 = global_id.x;
     var end: u32 = min(index + 64u, arrayLength(&result.leds));
-
-    // TODO: Feed from AUX
-    var r_max: f32 = 100.0;
-    var g_max: f32 = 150.0;
-    var b_max: f32 = 100.0;
 
     loop {
         var position: Coord = positions.data[index];
@@ -65,13 +69,13 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
         let noise_g: f32 = noise_data_g.noise[u32((position.x * f32(noise_data_g.size_x)) + (position.y * f32(noise_data_g.size_y)) + position.z)];
         let noise_b: f32 = noise_data_b.noise[u32((position.x * f32(noise_data_b.size_x)) + (position.y * f32(noise_data_b.size_y)) + position.z)];
 
-        let value_r: f32 = noise_r * f32(r_max);
-        let value_g: f32 = noise_g * f32(g_max);
-        let value_b: f32 = noise_b * f32(b_max);
+        let value_r: f32 = noise_r * f32(r_max.val);
+        let value_g: f32 = noise_g * f32(g_max.val);
+        let value_b: f32 = noise_b * f32(b_max.val);
 
-        result.leds[index].r = u32(value_r);
-        result.leds[index].g = u32(value_g);
-        result.leds[index].b = u32(value_b);
+        result.leds[index].r = value_r;
+        result.leds[index].g = value_g;
+        result.leds[index].b = value_b;
 
         index = index + 1u;
 

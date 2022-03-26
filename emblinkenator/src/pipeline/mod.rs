@@ -629,10 +629,10 @@ impl EmblinkenatorPipeline {
             if let Ok(()) = buffer_future.await {
                 // Gets contents of buffer
                 let data = buffer_slice.get_mapped_range();
-                // Since contents are got in bytes, this converts these bytes back to u32
-                let result: Vec<u32> = data
+                // Since contents are got in bytes, this converts these bytes back to f32
+                let result: Vec<f32> = data
                     .chunks_exact(4)
-                    .map(|b| u32::from_ne_bytes(b.try_into().unwrap()))
+                    .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
                     .collect();
 
                 let state: Vec<LED> = result.chunks(3).map(LED::from).collect();
