@@ -69,6 +69,10 @@ impl TryFrom<AuxDataF32VecUnchecked> for AuxDataF32Vec {
             return Result::Err(AuxDataFromVecError::DimensionMismatch);
         }
 
+        if value.data.iter().any(|v| *v < 0.0 || *v > 1.0) {
+            return Result::Err(AuxDataFromVecError::NotNormal);
+        }
+
         Ok(AuxDataF32Vec {
             data: value.data,
             size_dimension_1: value.size_dimension_1,
@@ -97,6 +101,14 @@ impl TryFrom<AuxDataF32Vec2Unchecked> for AuxDataF32Vec2 {
             .any(|d| d.len() != value.size_dimension_2 as usize)
         {
             return Result::Err(AuxDataFromVecError::DimensionMismatch);
+        }
+
+        if value
+            .data
+            .iter()
+            .any(|d| d.iter().any(|v| *v < 0.0 || *v > 1.0))
+        {
+            return Result::Err(AuxDataFromVecError::NotNormal);
         }
 
         Ok(AuxDataF32Vec2 {
@@ -133,6 +145,10 @@ impl TryFrom<AuxDataF32Vec3Unchecked> for AuxDataF32Vec3 {
                 .any(|d| d.len() != value.size_dimension_3 as usize)
             {
                 return Result::Err(AuxDataFromVecError::DimensionMismatch);
+            }
+
+            if val.iter().any(|d| d.iter().any(|v| *v < 0.0 || *v > 1.0)) {
+                return Result::Err(AuxDataFromVecError::NotNormal);
             }
         }
 
@@ -175,6 +191,10 @@ impl TryFrom<AuxDataF32Vec4Unchecked> for AuxDataF32Vec4 {
                 {
                     return Result::Err(AuxDataFromVecError::DimensionMismatch);
                 }
+
+                if val2.iter().any(|d| d.iter().any(|v| *v < 0.0 || *v > 1.0)) {
+                    return Result::Err(AuxDataFromVecError::NotNormal);
+                }
             }
         }
 
@@ -191,7 +211,7 @@ impl TryFrom<AuxDataF32Vec4Unchecked> for AuxDataF32Vec4 {
 #[derive(Debug)]
 pub enum AuxDataFromVecError {
     DimensionMismatch,
-    TooBig,
+    NotNormal,
 }
 
 #[derive(Debug, Clone)]
