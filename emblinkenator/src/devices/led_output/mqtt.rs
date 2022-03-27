@@ -1,5 +1,5 @@
 use std::{
-    thread::{self, sleep},
+    thread::{self, sleep, yield_now},
     time::Duration,
 };
 
@@ -60,9 +60,9 @@ impl MQTTSender {
 
         thread::spawn(move || {
             loop {
+                // Poll for the sake of making progress, but we don't care about the result
                 for (_, _) in connection.iter().enumerate() {
-                    // Poll for the sake of making progress, but we don't care about the result
-                    sleep(Duration::from_millis(1));
+                    yield_now();
                 }
             }
         });

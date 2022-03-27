@@ -12,7 +12,7 @@ use std::{
     fs,
     path::Path,
     sync::Arc,
-    thread::{self, sleep, JoinHandle},
+    thread::{self, yield_now, JoinHandle},
     time::Duration,
 };
 
@@ -165,7 +165,7 @@ async fn main() {
         let handle = thread::spawn(move || 'work: loop {
             obj.write().tick();
 
-            sleep(Duration::from_millis(1));
+            yield_now();
 
             if !running {
                 break 'work;
@@ -178,7 +178,7 @@ async fn main() {
     handles.push(thread::spawn(move || 'work: loop {
         block_on(event_loop.tick());
 
-        sleep(Duration::from_millis(1));
+        yield_now();
 
         if running {
             break 'work;

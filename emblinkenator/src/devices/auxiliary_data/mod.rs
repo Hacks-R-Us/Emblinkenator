@@ -5,8 +5,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    thread::{self, sleep, JoinHandle},
-    time::Duration,
+    thread::{self, yield_now, JoinHandle},
 };
 
 use enum_dispatch::enum_dispatch;
@@ -51,7 +50,7 @@ impl ThreadedAuxiliaryDeviceWrapper {
             while alive.load(Ordering::SeqCst) {
                 device_thread.write().tick();
 
-                sleep(Duration::from_millis(1));
+                yield_now();
             }
         }));
 
