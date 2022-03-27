@@ -4,11 +4,7 @@ use log::{debug, warn};
 use noise::NoiseFn;
 use serde::Deserialize;
 
-use crate::{
-    auxiliary_data::{AuxDataF32Vec3Unchecked, AuxiliaryDataType},
-    frame::FrameData,
-    id::DeviceId,
-};
+use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData, id::DeviceId};
 
 use super::AuxiliaryDataDevice;
 
@@ -51,27 +47,28 @@ impl NoiseAuxiliaryDataDevice {
         // TODO: Allow rate to change (samples per second)
         let time_point = frame_data.whole_seconds_elapsed;
 
+        let size_x: u32 = 10;
+        let size_y: u32 = 10;
+        let size_z: u32 = 10;
+
         match self.noise_function {
             NoiseFunction::Perlin(perlin) => {
-                let mut res: Vec<Vec<Vec<f32>>> = vec![];
+                let mut res: Vec<f32> =
+                    Vec::with_capacity(size_x as usize * size_y as usize * size_z as usize);
 
                 let start = Instant::now();
 
-                for x in 0..10 {
-                    let mut y_vec: Vec<Vec<f32>> = vec![];
-                    for y in 0..10 {
-                        let mut z_vec: Vec<f32> = vec![];
-                        for z in 0..10 {
-                            z_vec.push(perlin.get([
+                for x in 0..size_x {
+                    for y in 0..size_y {
+                        for z in 0..size_z {
+                            res.push(perlin.get([
                                 f64::from(x),
                                 f64::from(y),
                                 f64::from(z),
                                 f64::from(time_point),
                             ]) as _);
                         }
-                        y_vec.push(z_vec);
                     }
-                    res.push(y_vec);
                 }
 
                 let elapsed_time = Instant::now().duration_since(start).as_millis();
@@ -82,12 +79,7 @@ impl NoiseAuxiliaryDataDevice {
                     elapsed_time
                 );
 
-                let unchecked_data = AuxDataF32Vec3Unchecked {
-                    data: res,
-                    size_dimension_1: 10,
-                    size_dimension_2: 10,
-                    size_dimension_3: 10,
-                };
+                let unchecked_data = (res, size_x as usize, size_y as usize, size_z as usize);
 
                 AuxiliaryDataType::F32Vec3(
                     unchecked_data
