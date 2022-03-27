@@ -42,7 +42,7 @@ pub enum DeviceType {
 #[derive(Deserialize, Clone)]
 pub enum DeviceConfigType {
     LEDDataOutput(LEDOutputConfigType),
-    Auxiliary(AuxiliaryDataConfigType),
+    Auxiliary(AuxiliaryDataConfig),
 }
 
 #[allow(clippy::upper_case_acronyms)]
@@ -53,13 +53,19 @@ pub enum LEDOutputConfigType {
 }
 
 #[derive(Deserialize, Clone)]
+struct AuxiliaryDataConfig {
+    aux_id: String,
+    config: AuxiliaryDataConfigType,
+}
+
+#[derive(Deserialize, Clone)]
 pub enum AuxiliaryDataConfigType {
     Noise(NoiseAuxiliaryConfig),
 }
 
 struct DeviceConfigWithId(DeviceId, DeviceConfigType);
 struct LEDOutputConfigWithId(DeviceId, LEDOutputConfigType);
-struct AuxiliaryDataConfigWithId(DeviceId, AuxiliaryDataConfigType);
+struct AuxiliaryDataConfigWithId(DeviceId, AuxiliaryDataConfig);
 
 pub enum DeviceOutputType {
     Auxiliary(AuxiliaryDataTypeConsumer),
@@ -199,8 +205,8 @@ impl From<LEDOutputConfigWithId> for LEDDataOutputDeviceType {
     }
 }
 
-impl From<AuxiliaryDataConfigType> for AuxiliaryDataDeviceType {
-    fn from(auxiliary_device_config: AuxiliaryDataConfigType) -> Self {
+impl From<AuxiliaryDataConfig> for AuxiliaryDataDeviceType {
+    fn from(auxiliary_device_config: AuxiliaryDataConfig) -> Self {
         let auxiliary_device_with_id =
             AuxiliaryDataConfigWithId(DeviceId::new(), auxiliary_device_config);
         auxiliary_device_with_id.into()
@@ -212,7 +218,7 @@ impl From<AuxiliaryDataConfigWithId> for AuxiliaryDataDeviceType {
         let device_id = auxiliary_device_config_with_id.0;
         let auxiliary_device_config = auxiliary_device_config_with_id.1;
 
-        match auxiliary_device_config {
+        match auxiliary_device_config.config {
             AuxiliaryDataConfigType::Noise(noise_auxiliary_config) => {
                 AuxiliaryDataDeviceType::Noise(NoiseAuxiliaryDataDevice::new(
                     device_id,

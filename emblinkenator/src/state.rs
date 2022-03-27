@@ -6,7 +6,7 @@ use parking_lot::RwLock;
 
 use crate::{
     animation::manager::AnimationManager,
-    auxiliary_data::AuxiliaryDataManager,
+    auxiliary_data::manager::AuxiliaryDataManager,
     devices::manager::{DeviceManager, DeviceManagerEvent, ThreadedDeviceType},
     frame::FrameTimeKeeper,
     frame_resolver::FrameResolver,

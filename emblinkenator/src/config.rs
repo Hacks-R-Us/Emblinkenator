@@ -18,9 +18,10 @@ pub struct EmblinkenatorConfig {
 pub struct StartupConfig {
     pub fixtures: Vec<StartupFixture>,
     pub animations: Vec<StartupAnimations>,
+    pub auxiliaries: Vec<StartupAuxiliaries>,
     pub devices: Vec<StartupDevice>,
     pub fixtures_to_device: HashMap<String, String>,
-    // AnimationId -> [DeviceId]
+    // AnimationId -> [AuxiliaryId]
     pub animation_auxiliary_sources: HashMap<String, Vec<String>>,
 }
 
@@ -36,6 +37,16 @@ pub struct StartupAnimations {
     pub id: String,
     pub shader_id: String,
     pub target_id: StartupAnimationTargetType,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+pub enum StartupAuxiliaries {
+    F32 { id: String, initial_value: f32 },
+    F32Vec { id: String },
+    F32Vec2 { id: String },
+    F32Vec3 { id: String },
+    F32Vec4 { id: String },
 }
 
 #[derive(Deserialize)]

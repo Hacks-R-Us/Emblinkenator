@@ -36,7 +36,7 @@ use world::{
 
 use crate::config::EmblinkenatorConfig;
 use crate::{
-    animation::manager::AnimationManager, auxiliary_data::AuxiliaryDataManager,
+    animation::manager::AnimationManager, auxiliary_data::manager::AuxiliaryDataManager,
     frame::FrameTimeKeeper,
 };
 
