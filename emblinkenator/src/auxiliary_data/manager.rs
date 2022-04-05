@@ -4,38 +4,61 @@ use log::{debug, error, warn};
 use parking_lot::RwLock;
 use tokio::sync::broadcast::{channel, Receiver};
 
+use crate::devices::auxiliary_data::AuxDeviceData;
 use crate::state::WantsDeviceState;
 use crate::{
     id::{AnimationId, AuxiliaryId, DeviceId},
     state::ThreadedObject,
 };
 
-use super::{AuxiliaryData, AuxiliaryDataType};
+use super::{AuxiliaryData, AuxiliaryDataType, AuxiliaryDataTypeConsumer};
+
+enum AddAuxiliaryError {
+    AuxiliaryExists(AuxiliaryId),
+}
 
 pub struct AuxiliaryDataManager {
-    auxiliary_to_device: RwLock<HashMap<AuxiliaryId, DeviceId>>,
     animation_auxiliary_sources: RwLock<HashMap<AnimationId, Vec<AuxiliaryId>>>,
-    auxiliary_data_buffers: RwLock<HashMap<AuxiliaryId, Receiver<AuxiliaryDataType>>>,
+    auxiliary_data_buffers: RwLock<HashMap<DeviceId, Receiver<AuxDeviceData>>>,
     auxiliary_data: RwLock<HashMap<AuxiliaryId, AuxiliaryData>>,
 }
 
 impl AuxiliaryDataManager {
     pub fn new() -> Self {
         AuxiliaryDataManager {
-            auxiliary_to_device: RwLock::new(HashMap::new()),
             animation_auxiliary_sources: RwLock::new(HashMap::new()),
             auxiliary_data_buffers: RwLock::new(HashMap::new()),
             auxiliary_data: RwLock::new(HashMap::new()),
         }
     }
 
-    pub fn get_available_auxiliaries(&self) -> Vec<AuxiliaryId> {
-        self.auxiliary_to_device.read().keys().cloned().collect()
+    pub fn add_auxiliary(
+        &self,
+        aux_id: AuxiliaryId,
+        aux_type: AuxiliaryDataTypeConsumer,
+        params: AuxiliaryConfigParams,
+    ) -> Result<(), AddAuxiliaryError> {
+        let auxiliaries = self.auxiliary_data.write();
+        if auxiliaries.contains_key(&aux_id) {
+            return Err(AddAuxiliaryError::AuxiliaryExists(aux_id));
+        }
+
+        let default_value = aux_type.default_aux_value();
+        let size = default_value.get_number_of_values();
+
+        auxiliaries.insert(
+            aux_id,
+            AuxiliaryData {
+                data: default_value,
+                size,
+            },
+        );
+
+        Ok(())
     }
 
-    // TODO: Remove
-    pub fn hack_get_device_of_auxiliary(&self, aux_id: &AuxiliaryId) -> Option<DeviceId> {
-        self.auxiliary_to_device.read().get(aux_id).cloned()
+    pub fn get_available_auxiliaries(&self) -> Vec<AuxiliaryId> {
+        self.auxiliary_data.read().keys().cloned().collect()
     }
 
     pub fn get_auxiliary_data(&self) -> HashMap<AuxiliaryId, AuxiliaryData> {
@@ -58,14 +81,10 @@ impl AuxiliaryDataManager {
             .insert(animation_id, sources);
     }
 
-    fn read_aux_data_from(
-        &mut self,
-        auxiliary_id: AuxiliaryId,
-        receiver: Receiver<AuxiliaryDataType>,
-    ) {
+    fn read_aux_data_from(&mut self, device_id: DeviceId, receiver: Receiver<AuxDeviceData>) {
         self.auxiliary_data_buffers
             .write()
-            .insert(auxiliary_id, receiver);
+            .insert(device_id, receiver);
     }
 }
 
@@ -76,10 +95,14 @@ impl ThreadedObject for AuxiliaryDataManager {
                 Ok(data) => {
                     debug!("Received aux data from {}", aux_id);
                     // TODO: If size has changed, we need to recreate the auxiliary
-                    let size = data.get_number_of_values();
-                    self.auxiliary_data
-                        .write()
-                        .insert(aux_id.clone(), AuxiliaryData { data, size });
+                    let size = data.data.get_number_of_values();
+                    self.auxiliary_data.write().insert(
+                        data.aux_id.clone(),
+                        AuxiliaryData {
+                            data: data.data,
+                            size,
+                        },
+                    );
                 }
                 Err(err) => match err {
                     tokio::sync::broadcast::error::TryRecvError::Empty => {}
@@ -108,14 +131,40 @@ impl WantsDeviceState for AuxiliaryDataManager {
             match &mut *device.write() {
                 crate::devices::manager::ThreadedDeviceType::LEDDataOutput(_) => {} // Nothing to do
                 crate::devices::manager::ThreadedDeviceType::AuxiliaryData(aux_device) => {
-                    let aux_id = AuxiliaryId::new();
-                    self.auxiliary_to_device
-                        .write()
-                        .insert(aux_id.clone(), device_id.clone());
                     let (sender, receiver) = channel(1);
                     aux_device.send_into_buffer(sender);
-                    self.read_aux_data_from(aux_id, receiver);
+                    self.read_aux_data_from(device_id, receiver);
                 }
+            }
+        }
+    }
+}
+
+pub enum AuxiliaryConfigParams {
+    Empty,
+    F32,
+    F32Vec,
+    F32Vec2,
+    F32Vec3,
+    F32Vec4,
+}
+
+impl AuxiliaryConfigParams {
+    fn is_compatible(self, aux_type: AuxiliaryDataTypeConsumer) -> bool {
+        match self {
+            AuxiliaryConfigParams::Empty => matches!(aux_type, AuxiliaryDataTypeConsumer::Empty),
+            AuxiliaryConfigParams::F32 => matches!(aux_type, AuxiliaryDataTypeConsumer::F32),
+            AuxiliaryConfigParams::F32Vec => {
+                matches!(aux_type, AuxiliaryDataTypeConsumer::F32Vec)
+            }
+            AuxiliaryConfigParams::F32Vec2 => {
+                matches!(aux_type, AuxiliaryDataTypeConsumer::F32Vec2)
+            }
+            AuxiliaryConfigParams::F32Vec3 => {
+                matches!(aux_type, AuxiliaryDataTypeConsumer::F32Vec3)
+            }
+            AuxiliaryConfigParams::F32Vec4 => {
+                matches!(aux_type, AuxiliaryDataTypeConsumer::F32Vec4)
             }
         }
     }

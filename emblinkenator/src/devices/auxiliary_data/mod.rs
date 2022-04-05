@@ -11,18 +11,25 @@ use std::{
 use enum_dispatch::enum_dispatch;
 use parking_lot::RwLock;
 
-use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData};
+use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData, id::AuxiliaryId};
 
 use self::noise::NoiseAuxiliaryDataDevice;
+
+#[derive(Debug, Clone)]
+pub struct AuxDeviceData {
+    pub aux_id: AuxiliaryId,
+    pub data: AuxiliaryDataType,
+}
 
 #[enum_dispatch]
 pub trait AuxiliaryDataDevice: Send + Sync {
     fn tick(&mut self);
+    fn send_data_to_aux(&mut self, aux_id: AuxiliaryId);
     fn receive_next_frame_data_buffer(
         &mut self,
         buffer: tokio::sync::broadcast::Receiver<FrameData>,
     );
-    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryDataType>);
+    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxDeviceData>);
 }
 
 #[enum_dispatch(AuxiliaryDataDevice)]
@@ -70,6 +77,10 @@ impl ThreadedAuxiliaryDeviceWrapper {
             .expect("Could not join spawned thread");
     }
 
+    pub fn send_data_to_aux(&mut self, aux_id: AuxiliaryId) {
+        self.device.write().send_data_to_aux(aux_id);
+    }
+
     pub fn receive_next_frame_data_buffer(
         &mut self,
         buffer: tokio::sync::broadcast::Receiver<FrameData>,
@@ -77,7 +88,7 @@ impl ThreadedAuxiliaryDeviceWrapper {
         self.device.write().receive_next_frame_data_buffer(buffer)
     }
 
-    pub fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryDataType>) {
+    pub fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxDeviceData>) {
         self.device.write().send_into_buffer(buffer)
     }
 }

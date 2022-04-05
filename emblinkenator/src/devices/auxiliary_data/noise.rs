@@ -4,9 +4,13 @@ use log::{debug, warn};
 use noise::NoiseFn;
 use serde::Deserialize;
 
-use crate::{auxiliary_data::AuxiliaryDataType, frame::FrameData, id::DeviceId};
+use crate::{
+    auxiliary_data::AuxiliaryDataType,
+    frame::FrameData,
+    id::{AuxiliaryId, DeviceId},
+};
 
-use super::AuxiliaryDataDevice;
+use super::{AuxDeviceData, AuxiliaryDataDevice};
 
 #[derive(Debug, Deserialize, Clone)]
 pub enum NoiseType {
@@ -24,9 +28,10 @@ pub struct NoiseAuxiliaryConfig {
 
 pub struct NoiseAuxiliaryDataDevice {
     id: DeviceId,
+    aux_id: Option<AuxiliaryId>,
     noise_function: NoiseFunction,
     next_frame_data_buffer: Option<tokio::sync::broadcast::Receiver<FrameData>>,
-    data_output_buffer: Option<tokio::sync::broadcast::Sender<AuxiliaryDataType>>,
+    data_output_buffer: Option<tokio::sync::broadcast::Sender<AuxDeviceData>>,
 }
 
 impl NoiseAuxiliaryDataDevice {
@@ -37,6 +42,7 @@ impl NoiseAuxiliaryDataDevice {
 
         NoiseAuxiliaryDataDevice {
             id,
+            aux_id: None,
             noise_function,
             next_frame_data_buffer: None,
             data_output_buffer: None,
@@ -99,7 +105,7 @@ impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
         self.next_frame_data_buffer.replace(buffer);
     }
 
-    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxiliaryDataType>) {
+    fn send_into_buffer(&mut self, buffer: tokio::sync::broadcast::Sender<AuxDeviceData>) {
         self.data_output_buffer.replace(buffer);
     }
 
@@ -114,7 +120,9 @@ impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
             Ok(next_frame_data) => {
                 let data = self.get_noise_for_frame(next_frame_data);
                 if let Some(data_output_buffer) = self.data_output_buffer.as_mut() {
-                    data_output_buffer.send(data).ok();
+                    if let Some(aux_id) = self.aux_id {
+                        data_output_buffer.send(AuxDeviceData { aux_id, data }).ok();
+                    }
                 }
             }
             Err(err) => match err {
@@ -133,5 +141,9 @@ impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
                 ),
             },
         }
+    }
+
+    fn send_data_to_aux(&mut self, aux_id: crate::id::AuxiliaryId) {
+        self.aux_id.replace(aux_id);
     }
 }

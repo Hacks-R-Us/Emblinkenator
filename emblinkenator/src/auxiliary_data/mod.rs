@@ -21,7 +21,7 @@ pub enum AuxDataError {
     IncorrectDimensions,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct AuxDataF32Vec {
     data: Vec<f32>,
     size_dimension_1: u32,
@@ -45,7 +45,7 @@ impl TryFrom<(Vec<f32>, usize)> for AuxDataF32Vec {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct AuxDataF32Vec2 {
     data: Vec<f32>,
     size_dimension_1: u32,
@@ -73,7 +73,7 @@ impl TryFrom<(Vec<f32>, usize, usize)> for AuxDataF32Vec2 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct AuxDataF32Vec3 {
     data: Vec<f32>,
     size_dimension_1: u32,
@@ -104,7 +104,7 @@ impl TryFrom<(Vec<f32>, usize, usize, usize)> for AuxDataF32Vec3 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct AuxDataF32Vec4 {
     data: Vec<f32>,
     size_dimension_1: u32,
@@ -152,6 +152,27 @@ pub enum AuxiliaryDataTypeConsumer {
     F32Vec2,
     F32Vec3,
     F32Vec4,
+}
+
+impl AuxiliaryDataTypeConsumer {
+    fn default_aux_value(&self) -> AuxiliaryDataType {
+        match self {
+            AuxiliaryDataTypeConsumer::Empty => AuxiliaryDataType::Empty,
+            AuxiliaryDataTypeConsumer::F32 => AuxiliaryDataType::F32(f32::default()),
+            AuxiliaryDataTypeConsumer::F32Vec => {
+                AuxiliaryDataType::F32Vec(AuxDataF32Vec::default())
+            }
+            AuxiliaryDataTypeConsumer::F32Vec2 => {
+                AuxiliaryDataType::F32Vec2(AuxDataF32Vec2::default())
+            }
+            AuxiliaryDataTypeConsumer::F32Vec3 => {
+                AuxiliaryDataType::F32Vec3(AuxDataF32Vec3::default())
+            }
+            AuxiliaryDataTypeConsumer::F32Vec4 => {
+                AuxiliaryDataType::F32Vec4(AuxDataF32Vec4::default())
+            }
+        }
+    }
 }
 
 impl AuxiliaryData {
