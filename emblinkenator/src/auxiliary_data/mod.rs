@@ -21,7 +21,7 @@ pub enum AuxDataError {
     IncorrectDimensions,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct AuxDataF32Vec {
     data: Vec<f32>,
     size_dimension_1: u32,
@@ -45,7 +45,7 @@ impl TryFrom<(Vec<f32>, usize)> for AuxDataF32Vec {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct AuxDataF32Vec2 {
     data: Vec<f32>,
     size_dimension_1: u32,
@@ -73,7 +73,7 @@ impl TryFrom<(Vec<f32>, usize, usize)> for AuxDataF32Vec2 {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct AuxDataF32Vec3 {
     data: Vec<f32>,
     size_dimension_1: u32,
@@ -104,7 +104,7 @@ impl TryFrom<(Vec<f32>, usize, usize, usize)> for AuxDataF32Vec3 {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct AuxDataF32Vec4 {
     data: Vec<f32>,
     size_dimension_1: u32,
@@ -159,18 +159,28 @@ impl AuxiliaryDataTypeConsumer {
         match self {
             AuxiliaryDataTypeConsumer::Empty => AuxiliaryDataType::Empty,
             AuxiliaryDataTypeConsumer::F32 => AuxiliaryDataType::F32(f32::default()),
-            AuxiliaryDataTypeConsumer::F32Vec => {
-                AuxiliaryDataType::F32Vec(AuxDataF32Vec::default())
-            }
-            AuxiliaryDataTypeConsumer::F32Vec2 => {
-                AuxiliaryDataType::F32Vec2(AuxDataF32Vec2::default())
-            }
-            AuxiliaryDataTypeConsumer::F32Vec3 => {
-                AuxiliaryDataType::F32Vec3(AuxDataF32Vec3::default())
-            }
-            AuxiliaryDataTypeConsumer::F32Vec4 => {
-                AuxiliaryDataType::F32Vec4(AuxDataF32Vec4::default())
-            }
+            AuxiliaryDataTypeConsumer::F32Vec => AuxiliaryDataType::F32Vec(AuxDataF32Vec {
+                data: vec![0.0],
+                size_dimension_1: 0,
+            }),
+            AuxiliaryDataTypeConsumer::F32Vec2 => AuxiliaryDataType::F32Vec2(AuxDataF32Vec2 {
+                data: vec![0.0],
+                size_dimension_1: 0,
+                size_dimension_2: 0,
+            }),
+            AuxiliaryDataTypeConsumer::F32Vec3 => AuxiliaryDataType::F32Vec3(AuxDataF32Vec3 {
+                data: vec![0.0],
+                size_dimension_1: 0,
+                size_dimension_2: 0,
+                size_dimension_3: 0,
+            }),
+            AuxiliaryDataTypeConsumer::F32Vec4 => AuxiliaryDataType::F32Vec4(AuxDataF32Vec4 {
+                data: vec![0.0],
+                size_dimension_1: 0,
+                size_dimension_2: 0,
+                size_dimension_3: 0,
+                size_dimension_4: 0,
+            }),
         }
     }
 }
@@ -219,16 +229,19 @@ impl AuxiliaryDataType {
         match self {
             AuxiliaryDataType::Empty => 0,
             AuxiliaryDataType::F32(_) => 1,
-            AuxiliaryDataType::F32Vec(val) => val.size_dimension_1 + 1,
-            AuxiliaryDataType::F32Vec2(val) => val.size_dimension_1 * val.size_dimension_2 + 2,
+            AuxiliaryDataType::F32Vec(val) => val.size_dimension_1.max(1) + 1,
+            AuxiliaryDataType::F32Vec2(val) => {
+                (val.size_dimension_1 * val.size_dimension_2).max(1) + 2
+            }
             AuxiliaryDataType::F32Vec3(val) => {
-                val.size_dimension_1 * val.size_dimension_2 * val.size_dimension_3 + 3
+                (val.size_dimension_1 * val.size_dimension_2 * val.size_dimension_3).max(1) + 3
             }
             AuxiliaryDataType::F32Vec4(val) => {
-                val.size_dimension_1
+                (val.size_dimension_1
                     * val.size_dimension_2
                     * val.size_dimension_3
-                    * val.size_dimension_4
+                    * val.size_dimension_4)
+                    .max(1)
                     + 4
             }
         }

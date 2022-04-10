@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use tokio::sync::broadcast::{channel, Receiver};
 
@@ -13,7 +13,8 @@ use crate::{
 
 use super::{AuxiliaryData, AuxiliaryDataType, AuxiliaryDataTypeConsumer};
 
-enum AddAuxiliaryError {
+#[derive(Debug)]
+pub enum AddAuxiliaryError {
     AuxiliaryExists(AuxiliaryId),
 }
 
@@ -38,13 +39,30 @@ impl AuxiliaryDataManager {
         aux_type: AuxiliaryDataTypeConsumer,
         params: AuxiliaryConfigParams,
     ) -> Result<(), AddAuxiliaryError> {
-        let auxiliaries = self.auxiliary_data.write();
+        let mut auxiliaries = self.auxiliary_data.write();
         if auxiliaries.contains_key(&aux_id) {
             return Err(AddAuxiliaryError::AuxiliaryExists(aux_id));
         }
 
-        let default_value = aux_type.default_aux_value();
+        let mut default_value = aux_type.default_aux_value();
+        match params {
+            AuxiliaryConfigParams::Empty => {}
+            AuxiliaryConfigParams::F32 {
+                initial_value,
+                min_value,
+                max_value,
+            } => {
+                if let AuxiliaryDataType::F32(val) = &mut default_value {
+                    *val = initial_value
+                }
+            }
+            AuxiliaryConfigParams::F32Vec => {}
+            AuxiliaryConfigParams::F32Vec2 => {}
+            AuxiliaryConfigParams::F32Vec3 => {}
+            AuxiliaryConfigParams::F32Vec4 => {}
+        }
         let size = default_value.get_number_of_values();
+        info!("Default val {:?}", default_value);
 
         auxiliaries.insert(
             aux_id,
@@ -96,6 +114,10 @@ impl ThreadedObject for AuxiliaryDataManager {
                     debug!("Received aux data from {}", aux_id);
                     // TODO: If size has changed, we need to recreate the auxiliary
                     let size = data.data.get_number_of_values();
+                    if !self.auxiliary_data.read().contains_key(&data.aux_id) {
+                        debug!("Recieved data for auxiliary {} which doesn't exist", aux_id);
+                        continue;
+                    }
                     self.auxiliary_data.write().insert(
                         data.aux_id.clone(),
                         AuxiliaryData {
@@ -142,7 +164,11 @@ impl WantsDeviceState for AuxiliaryDataManager {
 
 pub enum AuxiliaryConfigParams {
     Empty,
-    F32,
+    F32 {
+        initial_value: f32,
+        min_value: f32,
+        max_value: f32,
+    },
     F32Vec,
     F32Vec2,
     F32Vec3,
@@ -150,10 +176,14 @@ pub enum AuxiliaryConfigParams {
 }
 
 impl AuxiliaryConfigParams {
-    fn is_compatible(self, aux_type: AuxiliaryDataTypeConsumer) -> bool {
+    fn is_compatible(&self, aux_type: AuxiliaryDataTypeConsumer) -> bool {
         match self {
             AuxiliaryConfigParams::Empty => matches!(aux_type, AuxiliaryDataTypeConsumer::Empty),
-            AuxiliaryConfigParams::F32 => matches!(aux_type, AuxiliaryDataTypeConsumer::F32),
+            AuxiliaryConfigParams::F32 {
+                initial_value,
+                min_value,
+                max_value,
+            } => matches!(aux_type, AuxiliaryDataTypeConsumer::F32),
             AuxiliaryConfigParams::F32Vec => {
                 matches!(aux_type, AuxiliaryDataTypeConsumer::F32Vec)
             }

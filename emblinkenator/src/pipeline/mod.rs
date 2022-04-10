@@ -22,7 +22,7 @@ pub struct EmblinkenatorPipeline {
     leds_per_compute_group: u32,
     compute_device: EmblinkenatorComputeDevice,
     frame_data_buffer: wgpu::Buffer,
-    compute_shaders: Vec<PipelineEntry>,
+    compute_shaders: HashMap<AnimationId, PipelineEntry>,
     auxiliary_buffers: HashMap<AuxiliaryId, PipelineAuxiliary>,
     empty_auxiliary_buffers: HashMap<AuxiliaryDataTypeConsumer, PipelineAuxiliary>,
     current_context: Option<PipelineContext>,
@@ -125,7 +125,7 @@ impl EmblinkenatorPipeline {
             leds_per_compute_group,
             compute_device,
             frame_data_buffer,
-            compute_shaders: vec![],
+            compute_shaders: HashMap::new(),
             auxiliary_buffers: HashMap::new(),
             empty_auxiliary_buffers,
             current_context: None,
@@ -144,18 +144,37 @@ impl EmblinkenatorPipeline {
 
         let prev_state = self.current_context.replace(context.clone());
         let mut added_animations: Vec<(AnimationId, Animation)> = vec![];
+        let mut removed_animations: Vec<AnimationId> = vec![];
         let mut added_auxiliaries: Vec<(AuxiliaryId, AuxiliaryData)> = vec![];
+        let mut resized_auxiliaries: Vec<(AuxiliaryId, AuxiliaryData)> = vec![];
+        let mut removed_auxiliaries: Vec<AuxiliaryId> = vec![];
         if let Some(prev_state) = prev_state {
             for auxiliary in context.auxiliary_data.iter() {
-                if !prev_state.auxiliary_data.contains_key(auxiliary.0) {
-                    // New auxiliary
-                    added_auxiliaries.push((auxiliary.0.clone(), auxiliary.1.clone()));
+                match prev_state.auxiliary_data.get(auxiliary.0) {
+                    Some(previous_auxiliary) => {
+                        if previous_auxiliary.size != auxiliary.1.size {
+                            info!(
+                                "Auxiliary {} changed size from {} to {}",
+                                auxiliary.0, previous_auxiliary.size, auxiliary.1.size
+                            );
+                            resized_auxiliaries.push((auxiliary.0.clone(), auxiliary.1.clone()))
+                        }
+                    }
+                    None => {
+                        // New auxiliary
+                        info!(
+                            "New auxiliary {} with size {}",
+                            auxiliary.0, auxiliary.1.size
+                        );
+                        added_auxiliaries.push((auxiliary.0.clone(), auxiliary.1.clone()));
+                    }
                 }
             }
 
             for animation in context.animations.iter() {
                 if !prev_state.animations.contains_key(animation.0) {
                     // New animation
+                    info!("New animation {}", animation.0);
                     added_animations.push((animation.0.clone(), animation.1.clone()));
                 }
             }
@@ -163,14 +182,15 @@ impl EmblinkenatorPipeline {
             for auxiliary in prev_state.auxiliary_data.iter() {
                 if !context.auxiliary_data.contains_key(auxiliary.0) {
                     // Removed auxiliary
-                    // TODO
+                    info!("Removed auxiliary {}", auxiliary.0);
+                    removed_auxiliaries.push(auxiliary.0.clone());
                 }
             }
 
             for animation in prev_state.animations.iter() {
                 if !context.animations.contains_key(animation.0) {
                     // Removed animation
-                    // TODO
+                    removed_animations.push(animation.0.clone());
                 }
             }
         } else {
@@ -187,12 +207,33 @@ impl EmblinkenatorPipeline {
                 .collect();
         }
 
+        if !removed_auxiliaries.is_empty() {
+            for removed_auxiliary in removed_auxiliaries.iter() {
+                self.remove_auxiliary(removed_auxiliary);
+            }
+            self.load_shaders_to_gpu();
+        }
+
+        if !resized_auxiliaries.is_empty() {
+            for resized_auxiliary in resized_auxiliaries.into_iter() {
+                self.remove_auxiliary(&resized_auxiliary.0);
+                added_auxiliaries.push(resized_auxiliary);
+            }
+            self.load_shaders_to_gpu();
+        }
+
         if !added_auxiliaries.is_empty() {
             for auxiliary in added_auxiliaries.into_iter() {
                 info!("Adding auxiliary {}", auxiliary.0);
                 self.add_auxiliary(auxiliary.0, auxiliary.1);
             }
             self.load_shaders_to_gpu();
+        }
+
+        if !removed_animations.is_empty() {
+            for removed_animation in removed_animations.iter() {
+                self.remove_shader(removed_animation);
+            }
         }
 
         if !added_animations.is_empty() {
@@ -387,23 +428,30 @@ impl EmblinkenatorPipeline {
             shader,
         );
 
-        self.compute_shaders.push(PipelineEntry {
-            id,
-            target_id,
-            storage_buffer,
-            staging_buffer,
-            compute_pipeline,
-            compute_bind_group,
-            result_bind_group,
-            auxiliary_bind_group_layout,
-            positions_data_buffer,
-            num_leds,
-            work_group_count,
-            result_size,
-            auxiliary_types: animation.get_auxiliaries().unwrap_or_default(),
-        });
+        self.compute_shaders.insert(
+            id.clone(),
+            PipelineEntry {
+                id,
+                target_id,
+                storage_buffer,
+                staging_buffer,
+                compute_pipeline,
+                compute_bind_group,
+                result_bind_group,
+                auxiliary_bind_group_layout,
+                positions_data_buffer,
+                num_leds,
+                work_group_count,
+                result_size,
+                auxiliary_types: animation.get_auxiliaries().unwrap_or_default(),
+            },
+        );
 
         Ok(())
+    }
+
+    pub fn remove_shader(&mut self, id: &AnimationId) {
+        self.compute_shaders.remove(id);
     }
 
     pub fn add_auxiliary(&mut self, id: AuxiliaryId, auxiliary: AuxiliaryData) {
@@ -419,6 +467,10 @@ impl EmblinkenatorPipeline {
         };
 
         self.auxiliary_buffers.insert(id, auxiliary);
+    }
+
+    pub fn remove_auxiliary(&mut self, id: &AuxiliaryId) {
+        self.auxiliary_buffers.remove(id);
     }
 
     pub fn load_shaders_to_gpu(&self) {
@@ -475,6 +527,11 @@ impl EmblinkenatorPipeline {
                     .compute_device
                     .create_auxiliary_data_buffer_src(auxiliary_id.unprotect(), &new_aux_data);
 
+                debug!(
+                    "Auxilairy {} size {}",
+                    auxiliary_id,
+                    new_aux_data.len() * mem::size_of::<u8>()
+                );
                 command_encoder.copy_buffer_to_buffer(
                     &aux_data_src,
                     0,
@@ -485,7 +542,7 @@ impl EmblinkenatorPipeline {
             }
         }
 
-        for shader in &self.compute_shaders {
+        for (_id, shader) in self.compute_shaders.iter() {
             let led_positions = context.led_positions.get(&shader.target_id);
 
             if led_positions.is_none() {
@@ -506,7 +563,7 @@ impl EmblinkenatorPipeline {
             for (index, required_aux) in required_auxiliaries.iter().enumerate() {
                 let mapped_aux_id = mapped_auxiliaries.get(index);
                 if mapped_aux_id.is_none() {
-                    warn!(
+                    debug!(
                         "Auxiliary {} is not mapped for shader {}, an empty buffer will be created",
                         index, shader.id
                     );
@@ -517,14 +574,14 @@ impl EmblinkenatorPipeline {
 
                 let aux = self.auxiliary_buffers.get(mapped_aux_id);
                 if aux.is_none() {
-                    error!("Aux {} is mapped for shader {} but does not exist in the current context, an empty buffer will be used", index, shader.id);
+                    error!("Auxiliary {} is mapped for shader {} but does not exist in the current context, an empty buffer will be used", index, shader.id);
                     invalid_auxiliaries.push((index as u32, required_aux.clone()));
                     continue;
                 }
                 let aux = aux.unwrap();
 
                 if !aux_data_consumer_type_is_compatible(&aux.aux_type, required_aux) {
-                    error!("Aux {} is mapped for shader {} but is not the right type, an empty buffer will be used", index, shader.id);
+                    error!("Auxiliary {} is mapped for shader {} but is not the right type, an empty buffer will be used", index, shader.id);
                     invalid_auxiliaries.push((index as u32, required_aux.clone()));
                     continue;
                 }
@@ -624,7 +681,7 @@ impl EmblinkenatorPipeline {
     pub async fn read_led_states(&mut self) -> ComputeOutput {
         let mut states: HashMap<String, Vec<LED>> = HashMap::new();
 
-        for shader in &self.compute_shaders {
+        for (_id, shader) in self.compute_shaders.iter() {
             let buffer_slice = shader.staging_buffer.slice(..);
             let buffer_future = buffer_slice.map_async(wgpu::MapMode::Read);
 

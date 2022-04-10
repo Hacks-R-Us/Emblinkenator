@@ -251,39 +251,32 @@ async fn main() {
 
         debug!("Adding auxiliaries");
 
-        let auxiliaries = config_auxiliary_manager.read().get_available_auxiliaries();
-        let mut device_to_auxiliary: HashMap<DeviceId, AuxiliaryId> = HashMap::new();
-
-        for aux_id in auxiliaries.iter() {
-            if let Some(device_id) = config_auxiliary_manager
-                .read()
-                .hack_get_device_of_auxiliary(aux_id)
-            {
-                device_to_auxiliary.insert(device_id, aux_id.to_owned());
-            } else {
-                panic!("Device does not exist for Auxiliary {}", aux_id);
-            }
+        for auxiliary in startup_config.auxiliaries {
+            config_auxiliary_manager
+                .write()
+                .add_auxiliary(
+                    auxiliary.clone().into(),
+                    auxiliary.clone().into(),
+                    auxiliary.clone().into(),
+                )
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Cannot add auxiliary {}",
+                        Into::<AuxiliaryId>::into(auxiliary)
+                    )
+                });
         }
 
-        for (animation_id, device_ids) in startup_config.animation_auxiliary_sources {
+        for (animation_id, aux_ids) in startup_config.animation_auxiliary_sources {
             // Need the resulting Aux Ids
             let animation_id = AnimationId::new_from(animation_id);
-            let device_ids: Vec<DeviceId> = device_ids
+            let aux_ids: Vec<AuxiliaryId> = aux_ids
                 .iter()
-                .map(|id| DeviceId::new_from(id.to_string()))
-                .collect();
-            let auxiliary_ids: Vec<AuxiliaryId> = device_ids
-                .iter()
-                .map(|id| {
-                    device_to_auxiliary
-                        .get(id)
-                        .cloned()
-                        .unwrap_or_else(|| panic!("Auxiliary does not exist for Device {}", id))
-                })
+                .map(|id| AuxiliaryId::new_from(id.to_string()))
                 .collect();
             config_auxiliary_manager
                 .write()
-                .set_animation_auxiliary_sources_to(animation_id, auxiliary_ids);
+                .set_animation_auxiliary_sources_to(animation_id, aux_ids);
         }
 
         debug!("Setup complete");

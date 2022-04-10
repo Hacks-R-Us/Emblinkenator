@@ -72,9 +72,9 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
         let noise_g: f32 = noise_data_g.noise[u32((position.x * f32(noise_data_g.size_x)) + (position.y * f32(noise_data_g.size_y)) + position.z)];
         let noise_b: f32 = noise_data_b.noise[u32((position.x * f32(noise_data_b.size_x)) + (position.y * f32(noise_data_b.size_y)) + position.z)];
 
-        let value_r: f32 = noise_r * f32(r_max.val);
-        let value_g: f32 = noise_g * f32(g_max.val);
-        let value_b: f32 = noise_b * f32(b_max.val);
+        let value_r: f32 = noise_r * r_max.val;
+        let value_g: f32 = noise_g * g_max.val;
+        let value_b: f32 = noise_b * b_max.val;
 
         result.leds[index].r = value_r;
         result.leds[index].g = value_g;

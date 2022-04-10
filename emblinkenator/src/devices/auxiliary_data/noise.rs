@@ -1,6 +1,6 @@
 use std::{convert::TryInto, time::Instant};
 
-use log::{debug, warn};
+use log::{debug, info, warn};
 use noise::NoiseFn;
 use serde::Deserialize;
 
@@ -35,14 +35,14 @@ pub struct NoiseAuxiliaryDataDevice {
 }
 
 impl NoiseAuxiliaryDataDevice {
-    pub fn new(id: DeviceId, config: NoiseAuxiliaryConfig) -> Self {
+    pub fn new(id: DeviceId, aux_id: AuxiliaryId, config: NoiseAuxiliaryConfig) -> Self {
         let noise_function: NoiseFunction = match config.noise_type {
             NoiseType::Perlin => NoiseFunction::Perlin(noise::Perlin::new()),
         };
 
         NoiseAuxiliaryDataDevice {
             id,
-            aux_id: None,
+            aux_id: Some(aux_id),
             noise_function,
             next_frame_data_buffer: None,
             data_output_buffer: None,
@@ -67,12 +67,16 @@ impl NoiseAuxiliaryDataDevice {
                 for x in 0..size_x {
                     for y in 0..size_y {
                         for z in 0..size_z {
-                            res.push(perlin.get([
-                                f64::from(x),
-                                f64::from(y),
-                                f64::from(z),
-                                f64::from(time_point),
-                            ]) as _);
+                            res.push(
+                                perlin
+                                    .get([
+                                        f64::from(x) + 0.1,
+                                        f64::from(y) + 0.1,
+                                        f64::from(z) + 0.1,
+                                        f64::from(time_point) + 0.1,
+                                    ])
+                                    .abs() as _,
+                            );
                         }
                     }
                 }
@@ -120,8 +124,13 @@ impl AuxiliaryDataDevice for NoiseAuxiliaryDataDevice {
             Ok(next_frame_data) => {
                 let data = self.get_noise_for_frame(next_frame_data);
                 if let Some(data_output_buffer) = self.data_output_buffer.as_mut() {
-                    if let Some(aux_id) = self.aux_id {
-                        data_output_buffer.send(AuxDeviceData { aux_id, data }).ok();
+                    if let Some(aux_id) = &self.aux_id {
+                        data_output_buffer
+                            .send(AuxDeviceData {
+                                aux_id: aux_id.clone(),
+                                data,
+                            })
+                            .ok();
                     }
                 }
             }

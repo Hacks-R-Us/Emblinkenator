@@ -2,7 +2,13 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{animation::ShadersConfig, devices::manager::DeviceConfigType, world::Coord};
+use crate::{
+    animation::ShadersConfig,
+    auxiliary_data::{manager::AuxiliaryConfigParams, AuxiliaryDataTypeConsumer},
+    devices::manager::DeviceConfigType,
+    id::AuxiliaryId,
+    world::Coord,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EmblinkenatorConfig {
@@ -39,14 +45,82 @@ pub struct StartupAnimations {
     pub target_id: StartupAnimationTargetType,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum StartupAuxiliaries {
-    F32 { id: String, initial_value: f32 },
-    F32Vec { id: String },
-    F32Vec2 { id: String },
-    F32Vec3 { id: String },
-    F32Vec4 { id: String },
+    F32 {
+        id: String,
+        initial_value: Option<f32>,
+        max_value: Option<f32>,
+        min_value: Option<f32>,
+    },
+    F32Vec {
+        id: String,
+    },
+    F32Vec2 {
+        id: String,
+    },
+    F32Vec3 {
+        id: String,
+    },
+    F32Vec4 {
+        id: String,
+    },
+}
+
+impl From<StartupAuxiliaries> for AuxiliaryId {
+    fn from(aux: StartupAuxiliaries) -> Self {
+        match aux {
+            StartupAuxiliaries::F32 {
+                id,
+                initial_value,
+                max_value,
+                min_value,
+            } => AuxiliaryId::new_from(id.to_string()),
+            StartupAuxiliaries::F32Vec { id } => AuxiliaryId::new_from(id.to_string()),
+            StartupAuxiliaries::F32Vec2 { id } => AuxiliaryId::new_from(id.to_string()),
+            StartupAuxiliaries::F32Vec3 { id } => AuxiliaryId::new_from(id.to_string()),
+            StartupAuxiliaries::F32Vec4 { id } => AuxiliaryId::new_from(id.to_string()),
+        }
+    }
+}
+
+impl From<StartupAuxiliaries> for AuxiliaryDataTypeConsumer {
+    fn from(aux: StartupAuxiliaries) -> Self {
+        match aux {
+            StartupAuxiliaries::F32 {
+                id,
+                initial_value,
+                max_value,
+                min_value,
+            } => AuxiliaryDataTypeConsumer::F32,
+            StartupAuxiliaries::F32Vec { id } => AuxiliaryDataTypeConsumer::F32Vec,
+            StartupAuxiliaries::F32Vec2 { id } => AuxiliaryDataTypeConsumer::F32Vec2,
+            StartupAuxiliaries::F32Vec3 { id } => AuxiliaryDataTypeConsumer::F32Vec3,
+            StartupAuxiliaries::F32Vec4 { id } => AuxiliaryDataTypeConsumer::F32Vec4,
+        }
+    }
+}
+
+impl From<StartupAuxiliaries> for AuxiliaryConfigParams {
+    fn from(aux: StartupAuxiliaries) -> Self {
+        match aux {
+            StartupAuxiliaries::F32 {
+                id,
+                initial_value,
+                max_value,
+                min_value,
+            } => AuxiliaryConfigParams::F32 {
+                initial_value: initial_value.unwrap_or(0.0),
+                max_value: max_value.unwrap_or(1.0).clamp(0.0, 1.0),
+                min_value: min_value.unwrap_or(0.0).clamp(0.0, 1.0),
+            },
+            StartupAuxiliaries::F32Vec { id } => AuxiliaryConfigParams::F32Vec,
+            StartupAuxiliaries::F32Vec2 { id } => AuxiliaryConfigParams::F32Vec2,
+            StartupAuxiliaries::F32Vec3 { id } => AuxiliaryConfigParams::F32Vec3,
+            StartupAuxiliaries::F32Vec4 { id } => AuxiliaryConfigParams::F32Vec4,
+        }
+    }
 }
 
 #[derive(Deserialize)]

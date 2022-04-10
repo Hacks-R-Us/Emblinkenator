@@ -6,7 +6,7 @@ use tokio::sync::broadcast::Sender;
 
 use crate::{
     auxiliary_data::{AuxiliaryDataType, AuxiliaryDataTypeConsumer},
-    id::DeviceId,
+    id::{AuxiliaryId, DeviceId},
     led::LED,
     state::ThreadedObject,
 };
@@ -222,6 +222,7 @@ impl From<AuxiliaryDataConfigWithId> for AuxiliaryDataDeviceType {
             AuxiliaryDataConfigType::Noise(noise_auxiliary_config) => {
                 AuxiliaryDataDeviceType::Noise(NoiseAuxiliaryDataDevice::new(
                     device_id,
+                    AuxiliaryId::new_from(auxiliary_device_config.aux_id),
                     noise_auxiliary_config,
                 ))
             }
