@@ -6,7 +6,7 @@ use crate::{
     animation::{Animation, AnimationTargetType},
     auxiliary_data::{
         aux_data_consumer_type_is_compatible, aux_data_to_consumer_type, AuxiliaryData,
-        AuxiliaryDataTypeConsumer,
+        AuxiliaryDataType, AuxiliaryDataTypeConsumer,
     },
     frame::FrameData,
     id::{AnimationId, AuxiliaryId},
@@ -153,7 +153,7 @@ impl EmblinkenatorPipeline {
                 match prev_state.auxiliary_data.get(auxiliary.0) {
                     Some(previous_auxiliary) => {
                         if previous_auxiliary.size != auxiliary.1.size {
-                            info!(
+                            debug!(
                                 "Auxiliary {} changed size from {} to {}",
                                 auxiliary.0, previous_auxiliary.size, auxiliary.1.size
                             );
@@ -162,7 +162,7 @@ impl EmblinkenatorPipeline {
                     }
                     None => {
                         // New auxiliary
-                        info!(
+                        debug!(
                             "New auxiliary {} with size {}",
                             auxiliary.0, auxiliary.1.size
                         );
@@ -527,11 +527,6 @@ impl EmblinkenatorPipeline {
                     .compute_device
                     .create_auxiliary_data_buffer_src(auxiliary_id.unprotect(), &new_aux_data);
 
-                debug!(
-                    "Auxilairy {} size {}",
-                    auxiliary_id,
-                    new_aux_data.len() * mem::size_of::<u8>()
-                );
                 command_encoder.copy_buffer_to_buffer(
                     &aux_data_src,
                     0,
@@ -695,7 +690,7 @@ impl EmblinkenatorPipeline {
                 // Since contents are got in bytes, this converts these bytes back to f32
                 let result: Vec<f32> = data
                     .chunks_exact(4)
-                    .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
+                    .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
                     .collect();
 
                 let state: Vec<LED> = result.chunks(3).map(LED::from).collect();

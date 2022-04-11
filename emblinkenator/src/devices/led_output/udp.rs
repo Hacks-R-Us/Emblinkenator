@@ -60,7 +60,6 @@ impl LEDOutputDevice for UDPSender {
                 },
                 Ok(frame) => {
                     let payload: Vec<u8> = frame.iter().flat_map(|l| l.flat_u8()).collect();
-                    info!("Sending {:?}, {}", payload, payload.len());
                     self.socket.send_to(&payload, &self.address).ok();
                 }
             }

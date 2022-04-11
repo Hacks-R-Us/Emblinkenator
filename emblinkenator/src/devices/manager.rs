@@ -13,8 +13,7 @@ use crate::{
 
 use super::{
     auxiliary_data::{
-        noise::{NoiseAuxiliaryConfig, NoiseAuxiliaryDataDevice},
-        AuxiliaryDataDeviceType, ThreadedAuxiliaryDeviceWrapper,
+        noise::NoiseAuxiliaryDataDevice, AuxiliaryDataDeviceType, ThreadedAuxiliaryDeviceWrapper,
     },
     led_output::{
         mqtt::{MQTTSender, MQTTSenderConfig},
@@ -59,8 +58,9 @@ struct AuxiliaryDataConfig {
 }
 
 #[derive(Deserialize, Clone)]
+#[serde(tag = "type")]
 pub enum AuxiliaryDataConfigType {
-    Noise(NoiseAuxiliaryConfig),
+    Noise,
 }
 
 struct DeviceConfigWithId(DeviceId, DeviceConfigType);
@@ -219,11 +219,10 @@ impl From<AuxiliaryDataConfigWithId> for AuxiliaryDataDeviceType {
         let auxiliary_device_config = auxiliary_device_config_with_id.1;
 
         match auxiliary_device_config.config {
-            AuxiliaryDataConfigType::Noise(noise_auxiliary_config) => {
+            AuxiliaryDataConfigType::Noise => {
                 AuxiliaryDataDeviceType::Noise(NoiseAuxiliaryDataDevice::new(
                     device_id,
                     AuxiliaryId::new_from(auxiliary_device_config.aux_id),
-                    noise_auxiliary_config,
                 ))
             }
         }

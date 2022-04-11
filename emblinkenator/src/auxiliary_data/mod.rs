@@ -195,30 +195,32 @@ impl AuxiliaryDataType {
     pub fn to_data_buffer(&self) -> Vec<u8> {
         match self {
             AuxiliaryDataType::Empty => vec![],
-            AuxiliaryDataType::F32(val) => val.to_be_bytes().to_vec(),
+            AuxiliaryDataType::F32(val) => {
+                vec![bytemuck::cast_slice(&val.to_le_bytes()).to_vec()].concat()
+            }
             AuxiliaryDataType::F32Vec(val) => vec![
-                (val.size_dimension_1).to_be_bytes().to_vec(),
+                (val.size_dimension_1).to_le_bytes().to_vec(),
                 bytemuck::cast_slice(&val.data).to_vec(),
             ]
             .concat(),
             AuxiliaryDataType::F32Vec2(val) => vec![
-                val.size_dimension_1.to_be_bytes().to_vec(),
-                val.size_dimension_2.to_be_bytes().to_vec(),
+                val.size_dimension_1.to_le_bytes().to_vec(),
+                val.size_dimension_2.to_le_bytes().to_vec(),
                 bytemuck::cast_slice(&val.data).to_vec(),
             ]
             .concat(),
             AuxiliaryDataType::F32Vec3(val) => vec![
-                val.size_dimension_1.to_be_bytes().to_vec(),
-                val.size_dimension_2.to_be_bytes().to_vec(),
-                val.size_dimension_3.to_be_bytes().to_vec(),
+                val.size_dimension_1.to_le_bytes().to_vec(),
+                val.size_dimension_2.to_le_bytes().to_vec(),
+                val.size_dimension_3.to_le_bytes().to_vec(),
                 bytemuck::cast_slice(&val.data).to_vec(),
             ]
             .concat(),
             AuxiliaryDataType::F32Vec4(val) => vec![
-                val.size_dimension_1.to_be_bytes().to_vec(),
-                val.size_dimension_2.to_be_bytes().to_vec(),
-                val.size_dimension_3.to_be_bytes().to_vec(),
-                val.size_dimension_4.to_be_bytes().to_vec(),
+                val.size_dimension_1.to_le_bytes().to_vec(),
+                val.size_dimension_2.to_le_bytes().to_vec(),
+                val.size_dimension_3.to_le_bytes().to_vec(),
+                val.size_dimension_4.to_le_bytes().to_vec(),
                 bytemuck::cast_slice(&val.data).to_vec(),
             ]
             .concat(),
@@ -263,11 +265,11 @@ impl AuxiliaryDataTypeConsumer {
     pub fn empty_buffer(&self) -> Vec<u8> {
         match self {
             AuxiliaryDataTypeConsumer::Empty => vec![],
-            AuxiliaryDataTypeConsumer::F32 => 0.0_f32.to_be_bytes().to_vec(), // Default value: 0.0
+            AuxiliaryDataTypeConsumer::F32 => 0.0_f32.to_le_bytes().to_vec(), // Default value: 0.0
             AuxiliaryDataTypeConsumer::F32Vec => {
                 let empty: Vec<f32> = vec![0.0];
                 vec![
-                    0_u32.to_be_bytes().to_vec(), // size: 0
+                    0_u32.to_le_bytes().to_vec(), // size: 0
                     bytemuck::cast_slice(&empty).to_vec(),
                 ]
                 .concat()
@@ -275,8 +277,8 @@ impl AuxiliaryDataTypeConsumer {
             AuxiliaryDataTypeConsumer::F32Vec2 => {
                 let empty: Vec<f32> = vec![0.0];
                 vec![
-                    0_u32.to_be_bytes().to_vec(), // size_0: 0
-                    0_u32.to_be_bytes().to_vec(), // size_1: 0
+                    0_u32.to_le_bytes().to_vec(), // size_0: 0
+                    0_u32.to_le_bytes().to_vec(), // size_1: 0
                     bytemuck::cast_slice(&empty).to_vec(),
                 ]
                 .concat()
@@ -284,9 +286,9 @@ impl AuxiliaryDataTypeConsumer {
             AuxiliaryDataTypeConsumer::F32Vec3 => {
                 let empty: Vec<f32> = vec![0.0];
                 vec![
-                    0_u32.to_be_bytes().to_vec(), // size_0: 0
-                    0_u32.to_be_bytes().to_vec(), // size_1: 0
-                    0_u32.to_be_bytes().to_vec(), // size_2: 0
+                    0_u32.to_le_bytes().to_vec(), // size_0: 0
+                    0_u32.to_le_bytes().to_vec(), // size_1: 0
+                    0_u32.to_le_bytes().to_vec(), // size_2: 0
                     bytemuck::cast_slice(&empty).to_vec(),
                 ]
                 .concat()
@@ -294,10 +296,10 @@ impl AuxiliaryDataTypeConsumer {
             AuxiliaryDataTypeConsumer::F32Vec4 => {
                 let empty: Vec<f32> = vec![0.0];
                 vec![
-                    0_u32.to_be_bytes().to_vec(), // size_0: 0
-                    0_u32.to_be_bytes().to_vec(), // size_1: 0
-                    0_u32.to_be_bytes().to_vec(), // size_2: 0
-                    0_u32.to_be_bytes().to_vec(), // size_3: 0
+                    0_u32.to_le_bytes().to_vec(), // size_0: 0
+                    0_u32.to_le_bytes().to_vec(), // size_1: 0
+                    0_u32.to_le_bytes().to_vec(), // size_2: 0
+                    0_u32.to_le_bytes().to_vec(), // size_3: 0
                     bytemuck::cast_slice(&empty).to_vec(),
                 ]
                 .concat()

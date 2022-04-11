@@ -208,5 +208,5 @@ pub fn get_seconds_elapsed(
     frame_denominator: u32,
 ) -> f32 {
     // TODO: This will drift
-    current_frame as f32 * (frame_numerator as f32 / frame_denominator as f32)
+    (current_frame as f32 * (frame_numerator as f32 / frame_denominator as f32)) / 1000.0
 }

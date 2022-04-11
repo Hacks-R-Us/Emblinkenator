@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use parking_lot::RwLock;
 use tokio::sync::broadcast::{channel, Receiver};
 
@@ -62,7 +62,6 @@ impl AuxiliaryDataManager {
             AuxiliaryConfigParams::F32Vec4 => {}
         }
         let size = default_value.get_number_of_values();
-        info!("Default val {:?}", default_value);
 
         auxiliaries.insert(
             aux_id,
