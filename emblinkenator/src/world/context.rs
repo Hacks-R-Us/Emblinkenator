@@ -11,12 +11,7 @@ use crate::{
     id::{FixtureId, GroupId, InstallationId},
 };
 
-use super::{
-    fixture::Fixture,
-    group::Group,
-    installation::Installation,
-    Coord,
-};
+use super::{fixture::Fixture, group::Group, installation::Installation, Coord};
 
 pub struct WorldContext {
     event_emitter: Sender<WorldContextEvent>,
@@ -100,10 +95,16 @@ impl WorldContext {
     pub fn add_fixture(&self, fixture: Fixture) -> Result<(), WorldContextErrorAddFixture> {
         let id = fixture.id().clone();
 
-        if let Err(_err) = self.collection.fixtures.write().try_insert(id.clone(), fixture) {
+        if let Err(_err) = self
+            .collection
+            .fixtures
+            .write()
+            .try_insert(id.clone(), fixture)
+        {
             return Err(WorldContextErrorAddFixture::FixtureExists);
         }
 
+        self.on_state_changed();
         self.emit_fixture_added(id);
 
         Ok(())
@@ -113,21 +114,24 @@ impl WorldContext {
         &mut self,
         fixture_id: &FixtureId,
     ) -> Result<(), WorldContextErrorRemoveFixture> {
-        if self.collection.fixtures.write().remove(fixture_id).is_none() {
+        if self
+            .collection
+            .fixtures
+            .write()
+            .remove(fixture_id)
+            .is_none()
+        {
             return Err(WorldContextErrorRemoveFixture::FixtureDoesNotExist);
         }
 
+        self.on_state_changed();
         self.emit_fixture_removed(fixture_id.clone());
 
         Ok(())
     }
 
     pub fn get_fixture(&self, fixture_id: &FixtureId) -> Option<Fixture> {
-        self.collection
-            .fixtures
-            .write()
-            .get(fixture_id)
-            .cloned()
+        self.collection.fixtures.write().get(fixture_id).cloned()
     }
 
     pub fn add_installation(
@@ -145,6 +149,7 @@ impl WorldContext {
             return Err(WorldContextErrorAddInstallation::InstallationExists);
         }
 
+        self.on_state_changed();
         self.emit_installation_added(id);
 
         Ok(())
@@ -164,6 +169,7 @@ impl WorldContext {
             return Err(WorldContextErrorRemoveInstallation::InstallationDoesNotExist);
         }
 
+        self.on_state_changed();
         self.emit_installation_removed(installation_id.clone());
 
         Ok(())
@@ -184,6 +190,7 @@ impl WorldContext {
             return Err(WorldContextErrorAddGroup::GroupExists);
         }
 
+        self.on_state_changed();
         self.emit_group_added(id);
 
         Ok(())
@@ -194,29 +201,45 @@ impl WorldContext {
             return Err(WorldContextErrorRemoveGroup::GroupDoesNotExist);
         }
 
+        self.on_state_changed();
         self.emit_group_removed(group_id.clone());
 
         Ok(())
     }
 
     pub fn get_group(&self, group_id: &GroupId) -> Option<Group> {
-        self.collection
-            .groups
-            .write()
-            .get(group_id)
-            .cloned()
+        self.collection.groups.write().get(group_id).cloned()
     }
 
     pub fn get_registered_fixtures(&self) -> Vec<FixtureId> {
-        self.collection.fixtures.read().keys().map(|f| f.to_owned()).collect()
+        self.collection
+            .fixtures
+            .read()
+            .keys()
+            .map(|f| f.to_owned())
+            .collect()
     }
 
     pub fn get_registered_installations(&self) -> Vec<InstallationId> {
-        self.collection.installations.read().keys().map(|f| f.to_owned()).collect()
+        self.collection
+            .installations
+            .read()
+            .keys()
+            .map(|f| f.to_owned())
+            .collect()
     }
 
     pub fn get_registered_groups(&self) -> Vec<GroupId> {
-        self.collection.groups.read().keys().map(|f| f.to_owned()).collect()
+        self.collection
+            .groups
+            .read()
+            .keys()
+            .map(|f| f.to_owned())
+            .collect()
+    }
+
+    fn on_state_changed(&self) {
+        self.led_position_cache.lock().unwrap().take();
     }
 
     fn emit_fixture_added(&self, id: FixtureId) {

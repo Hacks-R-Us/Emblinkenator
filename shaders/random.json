@@ -1,0 +1,12 @@
+{
+    "id": "random",
+    "shader": "random.wgsl",
+    "auxiliaries": [
+        "F32",
+        "F32",
+        "F32",
+        "F32Vec3",
+        "F32Vec3",
+        "F32Vec3"
+    ]
+}

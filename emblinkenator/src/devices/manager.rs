@@ -1,35 +1,82 @@
-use log::{debug, error};
 use parking_lot::RwLock;
-use std::{collections::HashMap};
+use std::{collections::HashMap, sync::Arc};
 
-use tokio::sync::broadcast::{Receiver, Sender, channel, error::TryRecvError};
 use serde::Deserialize;
+use tokio::sync::broadcast::Sender;
 
-use crate::{frame_resolver::FrameResolverDataEvent, id::{DeviceId, FixtureId}, led::LED, state::ThreadedObject};
+use crate::{
+    auxiliary_data::{AuxiliaryDataType, AuxiliaryDataTypeConsumer},
+    id::{AuxiliaryId, DeviceId},
+    led::LED,
+    state::ThreadedObject,
+};
 
-use super::{mqtt::MQTTSenderConfig, threaded_device::{ThreadedDevice, ThreadedDeviceWrapper}, udp::UDPSenderConfig};
+use super::{
+    auxiliary_data::{
+        noise::NoiseAuxiliaryDataDevice, AuxiliaryDataDeviceType, ThreadedAuxiliaryDeviceWrapper,
+    },
+    led_output::{
+        mqtt::{MQTTSender, MQTTSenderConfig},
+        udp::{UDPSender, UDPSenderConfig},
+        LEDDataOutputDeviceType, ThreadedLEDOutputDeviceWrapper,
+    },
+};
 
 pub struct DeviceManager {
-    devices: RwLock<HashMap<DeviceId, ThreadedDeviceWrapper>>,
+    devices: RwLock<HashMap<DeviceId, Arc<RwLock<ThreadedDeviceType>>>>,
     led_data_buffers: RwLock<HashMap<DeviceId, Sender<Vec<LED>>>>,
-    subscribed_events: SubscribedEvents,
-    fixture_to_device: HashMap<FixtureId, DeviceId>,
+    event_emitters: RwLock<Vec<crossbeam::channel::Sender<DeviceManagerEvent>>>,
 }
 
-#[derive(Deserialize)]
+pub enum ThreadedDeviceType {
+    LEDDataOutput(ThreadedLEDOutputDeviceWrapper),
+    AuxiliaryData(ThreadedAuxiliaryDeviceWrapper),
+}
+
+pub enum DeviceType {
+    LEDDataOutput(LEDDataOutputDeviceType),
+    Auxiliary(AuxiliaryDataDeviceType),
+}
+
+#[derive(Deserialize, Clone)]
 pub enum DeviceConfigType {
     LEDDataOutput(LEDOutputConfigType),
+    Auxiliary(AuxiliaryDataConfig),
 }
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub enum LEDOutputConfigType {
     MQTT(MQTTSenderConfig),
-    UDP(UDPSenderConfig)
+    UDP(UDPSenderConfig),
 }
 
-pub trait LEDDataOutput: ThreadedDevice {
-    fn set_data_buffer(&mut self, receiver: Receiver<Vec<LED>>);
+#[derive(Deserialize, Clone)]
+struct AuxiliaryDataConfig {
+    aux_id: String,
+    config: AuxiliaryDataConfigType,
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum AuxiliaryDataConfigType {
+    Noise,
+}
+
+struct DeviceConfigWithId(DeviceId, DeviceConfigType);
+struct LEDOutputConfigWithId(DeviceId, LEDOutputConfigType);
+struct AuxiliaryDataConfigWithId(DeviceId, AuxiliaryDataConfig);
+
+pub enum DeviceOutputType {
+    Auxiliary(AuxiliaryDataTypeConsumer),
+}
+
+pub enum DeviceInputType {
+    LEDData,
+}
+
+pub enum DeviceOutput {
+    Auxiliary(AuxiliaryDataType),
 }
 
 pub enum DeviceManagerErrorAddDevice {
@@ -40,8 +87,10 @@ pub enum DeviceManagerErrorGetDevice {
     DeviceDoesNotExist(DeviceId),
 }
 
-struct SubscribedEvents {
-    frame_resolver: Vec<Receiver<FrameResolverDataEvent>>,
+#[derive(Clone)]
+pub enum DeviceManagerEvent {
+    DeviceAdded(DeviceId),
+    DeviceRemoved(DeviceId),
 }
 
 impl DeviceManager {
@@ -49,67 +98,132 @@ impl DeviceManager {
         DeviceManager {
             devices: RwLock::new(HashMap::new()),
             led_data_buffers: RwLock::new(HashMap::new()),
-            subscribed_events: SubscribedEvents {
-                frame_resolver: vec![],
-            },
-            fixture_to_device: HashMap::new(),
+            event_emitters: RwLock::new(vec![]),
         }
     }
 
-    pub fn add_led_device(&self, id: DeviceId, mut device: Box<dyn LEDDataOutput>) {
-        let (sender, receiver) = channel(10); // TODO: Get channel size from config
-        device.set_data_buffer(receiver);
-
-        let threaded_device = ThreadedDeviceWrapper::new(device);
-        self.devices.write().insert(id.clone(), threaded_device);
-        self.led_data_buffers.write().insert(id, sender);
+    pub fn add_device_from_config(&mut self, id: DeviceId, config: DeviceConfigType) {
+        let device: DeviceType = config.into();
+        let device = match device {
+            DeviceType::LEDDataOutput(led_data_output) => ThreadedDeviceType::LEDDataOutput(
+                ThreadedLEDOutputDeviceWrapper::new(led_data_output),
+            ),
+            DeviceType::Auxiliary(auxiliary) => {
+                ThreadedDeviceType::AuxiliaryData(ThreadedAuxiliaryDeviceWrapper::new(auxiliary))
+            }
+        };
+        self.add_device(id, device)
     }
 
-    pub fn remove_device(&self, _id: DeviceId) {}
-
-    pub fn set_fixture_to_device(&mut self, fixture_id: FixtureId, device_id: DeviceId) {
-        self.fixture_to_device.insert(fixture_id, device_id);
+    pub fn get_device(&self, id: &DeviceId) -> Option<Arc<RwLock<ThreadedDeviceType>>> {
+        self.devices.read().get(id).map(Arc::clone)
     }
 
-    pub fn listen_to_resolved_frames(&mut self, recv: Receiver<FrameResolverDataEvent>) {
-        self.subscribed_events.frame_resolver.push(recv);
+    pub fn add_device(&self, id: DeviceId, device: ThreadedDeviceType) {
+        let mut devices_lock = self.devices.write();
+        if devices_lock.contains_key(&id) {
+            todo!()
+        }
+
+        devices_lock.insert(id.clone(), Arc::new(RwLock::new(device)));
+
+        self.emit_device_added(id);
+    }
+
+    pub fn remove_device(&self, _id: DeviceId) {
+        todo!()
+    }
+
+    pub fn subscribe_to_events(&mut self) -> crossbeam::channel::Receiver<DeviceManagerEvent> {
+        let (sender, receiver) = crossbeam::channel::unbounded();
+        self.event_emitters.write().push(sender);
+
+        receiver
+    }
+
+    fn emit_device_added(&self, id: DeviceId) {
+        self.emit_event(DeviceManagerEvent::DeviceAdded(id));
+    }
+
+    fn emit_event(&self, event: DeviceManagerEvent) {
+        for sender in self.event_emitters.write().iter() {
+            sender.send(event.clone()).ok();
+        }
     }
 }
 
 impl ThreadedObject for DeviceManager {
-    fn run(&mut self) {
-        for event_subscriber in self.subscribed_events.frame_resolver.iter_mut() {
-            let event = event_subscriber.try_recv();
+    fn tick(&mut self) {}
+}
 
-            if event.is_err() {
-                if let Err(err) = event {
-                    match err {
-                        TryRecvError::Lagged(messages) => {
-                            error!(
-                                "Device manager lagged behind pipeline by {} messages",
-                                messages
-                            );
-                        }
-                        TryRecvError::Closed => {
-                            panic!("Frame resolver message channel closed");
-                        }
-                        TryRecvError::Empty => {}
-                    }
-                }
-                continue;
+impl From<DeviceConfigType> for DeviceType {
+    fn from(config: DeviceConfigType) -> Self {
+        let device_with_id = DeviceConfigWithId(DeviceId::new(), config);
+        device_with_id.into()
+    }
+}
+
+impl From<DeviceConfigWithId> for DeviceType {
+    fn from(device_with_id: DeviceConfigWithId) -> Self {
+        let device_id = device_with_id.0;
+        let config = device_with_id.1;
+
+        match config {
+            DeviceConfigType::LEDDataOutput(led_device_config) => {
+                let led_device_config_with_id = LEDOutputConfigWithId(device_id, led_device_config);
+                DeviceType::LEDDataOutput(led_device_config_with_id.into())
             }
-
-            let event = event.unwrap();
-
-            debug!("{:?}", event);
-
-            let device_id = self.fixture_to_device.get(&event.target);
-            if device_id.is_none() {
-                continue;
+            DeviceConfigType::Auxiliary(auxiliary_device_config) => {
+                let auxiliary_device_config_with_id =
+                    AuxiliaryDataConfigWithId(device_id, auxiliary_device_config);
+                DeviceType::Auxiliary(auxiliary_device_config_with_id.into())
             }
-            let device_id = device_id.unwrap();
-            if let Some(sender) = self.led_data_buffers.read().get(device_id) {
-                sender.send(event.data).ok();
+        }
+    }
+}
+
+impl From<LEDOutputConfigType> for LEDDataOutputDeviceType {
+    fn from(led_device_config: LEDOutputConfigType) -> Self {
+        let led_device_config_with_id = LEDOutputConfigWithId(DeviceId::new(), led_device_config);
+        led_device_config_with_id.into()
+    }
+}
+
+impl From<LEDOutputConfigWithId> for LEDDataOutputDeviceType {
+    fn from(led_device_config_with_id: LEDOutputConfigWithId) -> Self {
+        let device_id = led_device_config_with_id.0;
+        let led_device_config = led_device_config_with_id.1;
+
+        match led_device_config {
+            LEDOutputConfigType::MQTT(mqtt_device_config) => {
+                LEDDataOutputDeviceType::Mqtt(MQTTSender::new(device_id, mqtt_device_config))
+            }
+            LEDOutputConfigType::UDP(udp_device_config) => {
+                LEDDataOutputDeviceType::Udp(UDPSender::new(device_id, udp_device_config))
+            }
+        }
+    }
+}
+
+impl From<AuxiliaryDataConfig> for AuxiliaryDataDeviceType {
+    fn from(auxiliary_device_config: AuxiliaryDataConfig) -> Self {
+        let auxiliary_device_with_id =
+            AuxiliaryDataConfigWithId(DeviceId::new(), auxiliary_device_config);
+        auxiliary_device_with_id.into()
+    }
+}
+
+impl From<AuxiliaryDataConfigWithId> for AuxiliaryDataDeviceType {
+    fn from(auxiliary_device_config_with_id: AuxiliaryDataConfigWithId) -> Self {
+        let device_id = auxiliary_device_config_with_id.0;
+        let auxiliary_device_config = auxiliary_device_config_with_id.1;
+
+        match auxiliary_device_config.config {
+            AuxiliaryDataConfigType::Noise => {
+                AuxiliaryDataDeviceType::Noise(NoiseAuxiliaryDataDevice::new(
+                    device_id,
+                    AuxiliaryId::new_from(auxiliary_device_config.aux_id),
+                ))
             }
         }
     }

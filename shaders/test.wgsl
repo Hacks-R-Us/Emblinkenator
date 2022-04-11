@@ -1,16 +1,17 @@
-[[block]]
 struct FrameData {
-  frame: f32;
-  frame_rate: f32;
+    frame: f32;
+    frame_numerator: f32;
+    frame_denominator: f32;
+    seconds_elapsed: f32;
+    whole_seconds_elapsed: f32;
 };
 
 struct LED {
-    r: u32;
-    g: u32;
-    b: u32;
+    r: f32;
+    g: f32;
+    b: f32;
 };
 
-[[block]]
 struct Result {
     leds: [[stride(12)]] array<LED>;
 };
@@ -21,7 +22,6 @@ struct Coord {
     z: f32;
 };
 
-[[block]]
 struct Positions {
     data: [[stride(12)]] array<Coord>;
 };
@@ -35,15 +35,15 @@ var<storage, read> positions: Positions;
 [[group(1), binding(0)]]
 var<storage, read_write> result: Result;
 
-[[stage(compute), workgroup_size(100)]]
+[[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var index: u32 = global_id.x;
-    var end: u32 = index + 10u;
+    var end: u32 = min(index + 64u, arrayLength(&result.leds));
 
     loop {
-        result.leds[index].r = u32(positions.data[index].x);
-        result.leds[index].g = u32(positions.data[index].y);
-        result.leds[index].b = u32(positions.data[index].z);
+        result.leds[index].r = positions.data[index].x;
+        result.leds[index].g = positions.data[index].y;
+        result.leds[index].b = positions.data[index].z;
 
         index = index + 1u;
 

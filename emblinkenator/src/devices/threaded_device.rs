@@ -1,12 +1,21 @@
-use std::{sync::{Arc, atomic::{AtomicBool, Ordering}}, thread::{self, JoinHandle}};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::{self, yield_now, JoinHandle},
+};
+
+use enum_dispatch::enum_dispatch;
 
 pub struct ThreadedDeviceWrapper {
     running: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
 }
 
+#[enum_dispatch]
 pub trait ThreadedDevice: Send {
-    fn run (&mut self);
+    fn tick(&mut self);
 }
 
 impl ThreadedDeviceWrapper {
@@ -18,20 +27,21 @@ impl ThreadedDeviceWrapper {
 
         let handle = Some(thread::spawn(move || {
             while alive.load(Ordering::SeqCst) {
-                device.run()
+                device.tick();
+
+                yield_now();
             }
         }));
 
-        ThreadedDeviceWrapper {
-            running,
-            handle,
-        }
+        ThreadedDeviceWrapper { running, handle }
     }
 
     pub async fn stop(&mut self) {
         self.running.store(false, Ordering::SeqCst);
         self.handle
-            .take().expect("Called stop on non-running thread")
-            .join().expect("Could not join spawned thread");
+            .take()
+            .expect("Called stop on non-running thread")
+            .join()
+            .expect("Could not join spawned thread");
     }
 }

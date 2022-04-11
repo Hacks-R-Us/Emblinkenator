@@ -3,26 +3,22 @@ use std::{borrow::Cow, mem};
 use log::info;
 use wgpu::util::DeviceExt;
 
+use crate::{frame::FrameData, id::AnimationId};
+
 pub struct EmblinkenatorComputeDevice {
     device: wgpu::Device,
     queue: wgpu::Queue,
 }
 
 impl EmblinkenatorComputeDevice {
-    fn new(
-        device: wgpu::Device,
-        queue: wgpu::Queue,
-    ) -> EmblinkenatorComputeDevice {
-        EmblinkenatorComputeDevice {
-            device,
-            queue,
-        }
+    fn new(device: wgpu::Device, queue: wgpu::Queue) -> EmblinkenatorComputeDevice {
+        EmblinkenatorComputeDevice { device, queue }
     }
 
-    pub fn create_shader_module(&self, shader: String) -> wgpu::ShaderModule {
+    pub fn create_shader_module(&self, id: AnimationId, shader: String) -> wgpu::ShaderModule {
         self.device
             .create_shader_module(&wgpu::ShaderModuleDescriptor {
-                label: None,
+                label: Some(&id.unprotect()),
                 source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(shader.as_str())),
             })
     }
@@ -74,7 +70,16 @@ impl EmblinkenatorComputeDevice {
     pub fn create_frame_data_buffer_dest(&self, id: String) -> wgpu::Buffer {
         self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(format!("Frame Data Buffer Dest: {}", id).as_str()),
-            size: (2 * mem::size_of::<f32>()) as _, // TODO: 2 should be number of frame fields.
+            size: (FrameData::num_fields() * mem::size_of::<f32>()) as _,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        })
+    }
+
+    pub fn create_auxiliary_data_buffer_dest(&self, id: String, size: u64) -> wgpu::Buffer {
+        self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(format!("Aux Data Buffer Dest: {}", id).as_str()),
+            size,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         })
@@ -94,6 +99,15 @@ impl EmblinkenatorComputeDevice {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(format!("Frame Data Buffer Src: {}", id).as_str()),
                 contents: bytemuck::cast_slice(frame_data),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+            })
+    }
+
+    pub fn create_auxiliary_data_buffer_src(&self, id: String, aux_data: &[u8]) -> wgpu::Buffer {
+        self.device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("Auxiliary Data Buffer Src: {}", id)),
+                contents: aux_data,
                 usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
             })
     }
@@ -128,11 +142,16 @@ impl EmblinkenatorComputeDevice {
         _id: String,
         compute_bind_group_layout: &wgpu::BindGroupLayout,
         result_bind_group_layout: &wgpu::BindGroupLayout,
+        auxiliary_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> wgpu::PipelineLayout {
         self.device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("compute"),
-                bind_group_layouts: &[compute_bind_group_layout, result_bind_group_layout],
+                bind_group_layouts: &[
+                    compute_bind_group_layout,
+                    result_bind_group_layout,
+                    auxiliary_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             })
     }
@@ -202,6 +221,7 @@ pub async fn build_compute_device() -> EmblinkenatorComputeDevice {
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference,
             compatible_surface: None,
+            force_fallback_adapter: false,
         })
         .await
         .expect("No suitable GPU adapters found on the system!");

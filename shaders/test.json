@@ -1,0 +1,4 @@
+{
+    "id": "test",
+    "shader": "test.wgsl"
+}

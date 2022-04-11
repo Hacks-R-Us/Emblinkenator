@@ -5,7 +5,7 @@ use crate::id::AnimationId;
 
 use super::{
     factory::{get_animation_registry, AnimationRegistry},
-    Animation, AnimationTargetType,
+    Animation, AnimationTargetType, ShadersConfig,
 };
 
 pub struct AnimationManager {
@@ -18,16 +18,13 @@ pub enum AnimationManagerError {
     AnimationIsNotRegistered,
 }
 
-#[derive(Clone)]
-enum AnimationManagerOplog {}
-
 pub trait RecvAnimationManagerState: Send + Sync {
     fn recv(&self, state: HashMap<AnimationId, Animation>);
 }
 
 impl AnimationManager {
-    pub fn new() -> AnimationManager {
-        let animation_registry = get_animation_registry();
+    pub fn new(config: &ShadersConfig) -> AnimationManager {
+        let animation_registry = get_animation_registry(config);
 
         AnimationManager {
             registry: animation_registry,
@@ -37,6 +34,7 @@ impl AnimationManager {
 
     pub fn create_animation(
         &self,
+        id: AnimationId,
         shader_id: String,
         target: AnimationTargetType,
     ) -> Result<AnimationId, AnimationManagerError> {
@@ -49,8 +47,6 @@ impl AnimationManager {
         let manifest = manifest.unwrap();
 
         let animation = Animation::new(manifest, target);
-
-        let id = animation.id();
 
         self.animations
             .lock()

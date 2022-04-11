@@ -6,12 +6,12 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "1.5.0", features = ["full"] }
-wgpu = "0.10.1"
+wgpu = "0.12.0"
 pollster = "0.2.3"
 bytemuck = "1.5.1"
-rumqttc = "0.5.0"
+rumqttc = "0.10.0"
 uuid = { version = "0.8", features = ["v4"] }
-protected-id-derive = { path = "../protected-id-derive" }
+protected-id-derive = { version = "0.1" }
 lazy_static = { version="1.4.0" }
 crossbeam = { version="0.8.1" }
 futures = { version="0.3.15" }
@@ -21,3 +21,8 @@ env_logger = "0.9.0"
 log = "0.4.14"
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.67"
+glob = "0.3.0"
+enum_dispatch = "0.3.7"
+strum = "0.23.0"
+strum_macros = "0.23.1"
+rand = "0.8.5"

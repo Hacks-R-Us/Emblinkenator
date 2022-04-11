@@ -1,16 +1,17 @@
-[[block]]
 struct FrameData {
-  frame: f32;
-  frameRate: f32;
+    frame: f32;
+    frame_numerator: f32;
+    frame_denominator: f32;
+    seconds_elapsed: f32;
+    whole_seconds_elapsed: f32;
 };
 
 struct LED {
-    r: u32;
-    g: u32;
-    b: u32;
+    r: f32;
+    g: f32;
+    b: f32;
 };
 
-[[block]]
 struct Result {
     leds: [[stride(12)]] array<LED>;
 };
@@ -21,7 +22,6 @@ struct Coord {
     z: f32;
 };
 
-[[block]]
 struct Positions {
     data: [[stride(12)]] array<Coord>;
 };
@@ -36,7 +36,7 @@ var<storage, read> positions: Positions;
 var<storage, read_write> result: Result;
 
 fn get_pos (duration: f32) -> f32 {
-    var pos: f32 = ((f32(1.0 / params.frameRate) * params.frame) % duration) / duration;
+    var pos: f32 = (params.seconds_elapsed % duration) / duration;
 
     pos = pos * 2.0;
 
@@ -47,10 +47,10 @@ fn get_pos (duration: f32) -> f32 {
     return pos;
 }
 
-[[stage(compute), workgroup_size(100)]]
+[[stage(compute), workgroup_size(64)]]
 fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var index: u32 = global_id.x;
-    var end: u32 = index + 10u;
+    var end: u32 = min(index + 64u, arrayLength(&result.leds));
 
     var r_fade_duration: f32 = 10.0;
     var g_fade_duration: f32 = 3.0;
@@ -59,14 +59,14 @@ fn main([[builtin(global_invocation_id)]] global_id: vec3<u32>) {
     var r_pos: f32 = get_pos(r_fade_duration);
     var g_pos: f32 = get_pos(g_fade_duration);
     var b_pos: f32 = get_pos(b_fade_duration);
-    var r_max: f32 = 100.0;
-    var g_max: f32 = 150.0;
-    var b_max: f32 = 100.0;
+    var r_max: f32 = 1.0;
+    var g_max: f32 = 0.8;
+    var b_max: f32 = 0.5;
 
     loop {
-        result.leds[index].r = u32(floor(r_pos * r_max));
-        result.leds[index].g = u32(floor(g_pos * g_max));
-        result.leds[index].b = u32(floor(b_pos * b_max));
+        result.leds[index].r = r_pos * r_max;
+        result.leds[index].g = g_pos * g_max;
+        result.leds[index].b = b_pos * b_max;
 
         index = index + 1u;
 

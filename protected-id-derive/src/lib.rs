@@ -4,7 +4,8 @@ use syn::Field;
 
 extern crate proc_macro;
 extern crate syn;
-#[macro_use] extern crate quote;
+#[macro_use]
+extern crate quote;
 
 #[proc_macro_derive(ProtectedId, attributes(protected_value))]
 pub fn protected_id_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -51,21 +52,27 @@ fn generate_impl(ast: &syn::DeriveInput) -> quote::Tokens {
 
 fn get_ident_protected_value(body: &syn::Body) -> &syn::Ident {
     match *body {
-        syn::Body::Enum(_)
-            => panic!("ProtectedId cannot be implemented for enums"),
-        syn::Body::Struct(syn::VariantData::Unit)
-            => panic!("ProtectedId cannot be implemented for Unit structs"),
-        syn::Body::Struct(syn::VariantData::Tuple(_))
-            => panic!("ProtectedId cannot be implemented for Tuple structs"),
+        syn::Body::Enum(_) => panic!("ProtectedId cannot be implemented for enums"),
+        syn::Body::Struct(syn::VariantData::Unit) => {
+            panic!("ProtectedId cannot be implemented for Unit structs")
+        }
+        syn::Body::Struct(syn::VariantData::Tuple(_)) => {
+            panic!("ProtectedId cannot be implemented for Tuple structs")
+        }
         syn::Body::Struct(syn::VariantData::Struct(ref s)) => {
-            let field = s.iter().find(is_protected_value).unwrap_or_else(|| panic!("Struct does not have a field with attribute `protected_value`"));
-            field.ident.as_ref().unwrap_or_else(|| panic!("Cannot find identifier for field marked with `protected_value` attribute"))
+            let field = s.iter().find(is_protected_value).unwrap_or_else(|| {
+                panic!("Struct does not have a field with attribute `protected_value`")
+            });
+            field.ident.as_ref().unwrap_or_else(|| {
+                panic!("Cannot find identifier for field marked with `protected_value` attribute")
+            })
         }
     }
 }
 
-fn is_protected_value (field: &&Field) -> bool {
-    field.attrs
+fn is_protected_value(field: &&Field) -> bool {
+    field
+        .attrs
         .iter()
         .any(|a| a.value.name() == "protected_value")
 }
