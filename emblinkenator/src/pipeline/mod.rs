@@ -609,11 +609,13 @@ impl EmblinkenatorPipeline {
                 &auxiliary_group_entries,
             );
 
-            let led_positions_flat: Vec<f32> = led_positions
+            let mut led_positions_flat: Vec<f32> = led_positions
                 .unwrap()
                 .iter()
                 .flat_map(|p| p.flat())
                 .collect();
+
+            normalize_vec(&mut led_positions_flat);
 
             let led_positions_buffer = self.compute_device.create_positions_buffer_src(
                 format!("{} {}", shader.id.unprotect(), frame_data.frame).to_string(),
@@ -720,4 +722,16 @@ impl EmblinkenatorPipeline {
 
         ComputeOutput { states }
     }
+}
+
+fn normalize_vec(data: &mut [f32]) {
+    let max_value = data
+        .iter()
+        .fold(f32::MIN, |max, &val| if val > max { val } else { max });
+    let min_value = data
+        .iter()
+        .fold(f32::MAX, |min, &val| if val < min { val } else { min });
+
+    data.iter_mut()
+        .for_each(|val| *val = (*val - min_value) / (max_value - min_value));
 }
