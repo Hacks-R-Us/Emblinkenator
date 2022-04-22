@@ -16,6 +16,7 @@ use std::{
 };
 
 use animation::AnimationTargetType;
+use clap::Parser;
 use color_eyre::Report;
 
 use config::{StartupAnimationTargetType, StartupConfig};
@@ -61,8 +62,16 @@ mod world;
 
 // TODO: Set workgroup_size as override constant (blocked, track https://github.com/gfx-rs/wgpu/issues/1762)
 
+#[derive(Parser)]
+#[clap(version)]
+struct Cli {
+    startup_config: String,
+}
+
 #[tokio::main]
 async fn main() {
+    let argv = Cli::parse();
+
     setup_logging().unwrap();
 
     if !Path::exists(Path::new("config.json")) {
@@ -186,7 +195,7 @@ async fn main() {
 
     handles.push(thread::spawn(move || {
         let startup_config_json =
-            fs::read_to_string("startup-config.json").expect("Unable to read startup config file");
+            fs::read_to_string(argv.startup_config).expect("Unable to read startup config file");
         let startup_config: StartupConfig = serde_json::from_str(&startup_config_json).unwrap();
         for fixture in startup_config.fixtures {
             let mut positions = match fixture.led_positions {
