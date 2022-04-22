@@ -1,4 +1,10 @@
 {
     "id": "test",
-    "shader": "test.wgsl"
+    "shader": "test.wgsl",
+    "auxiliaries": [
+        "F32",
+        "F32",
+        "F32",
+        "F32"
+    ]
 }
