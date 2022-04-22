@@ -443,7 +443,7 @@ impl EmblinkenatorPipeline {
                 num_leds,
                 work_group_count,
                 result_size,
-                auxiliary_types: animation.get_auxiliaries().unwrap_or_default(),
+                auxiliary_types: animation.get_auxiliary_data_types().unwrap_or_default(),
             },
         );
 

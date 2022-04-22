@@ -50,22 +50,45 @@ pub struct StartupAnimations {
 pub enum StartupAuxiliaries {
     F32 {
         id: String,
+        name: String,
         initial_value: Option<f32>,
         max_value: Option<f32>,
         min_value: Option<f32>,
     },
     F32Vec {
         id: String,
+        name: String,
     },
     F32Vec2 {
         id: String,
+        name: String,
     },
     F32Vec3 {
         id: String,
+        name: String,
     },
     F32Vec4 {
         id: String,
+        name: String,
     },
+}
+
+impl StartupAuxiliaries {
+    pub fn get_name(&self) -> String {
+        match self {
+            StartupAuxiliaries::F32 {
+                id: _,
+                name,
+                initial_value: _,
+                max_value: _,
+                min_value: _,
+            } => name.clone(),
+            StartupAuxiliaries::F32Vec { id: _, name } => name.clone(),
+            StartupAuxiliaries::F32Vec2 { id: _, name } => name.clone(),
+            StartupAuxiliaries::F32Vec3 { id: _, name } => name.clone(),
+            StartupAuxiliaries::F32Vec4 { id: _, name } => name.clone(),
+        }
+    }
 }
 
 impl From<StartupAuxiliaries> for AuxiliaryId {
@@ -73,14 +96,15 @@ impl From<StartupAuxiliaries> for AuxiliaryId {
         match aux {
             StartupAuxiliaries::F32 {
                 id,
-                initial_value,
-                max_value,
-                min_value,
-            } => AuxiliaryId::new_from(id.to_string()),
-            StartupAuxiliaries::F32Vec { id } => AuxiliaryId::new_from(id.to_string()),
-            StartupAuxiliaries::F32Vec2 { id } => AuxiliaryId::new_from(id.to_string()),
-            StartupAuxiliaries::F32Vec3 { id } => AuxiliaryId::new_from(id.to_string()),
-            StartupAuxiliaries::F32Vec4 { id } => AuxiliaryId::new_from(id.to_string()),
+                name: _,
+                initial_value: _,
+                max_value: _,
+                min_value: _,
+            } => AuxiliaryId::new_from(id),
+            StartupAuxiliaries::F32Vec { id, name: _ } => AuxiliaryId::new_from(id),
+            StartupAuxiliaries::F32Vec2 { id, name: _ } => AuxiliaryId::new_from(id),
+            StartupAuxiliaries::F32Vec3 { id, name: _ } => AuxiliaryId::new_from(id),
+            StartupAuxiliaries::F32Vec4 { id, name: _ } => AuxiliaryId::new_from(id),
         }
     }
 }
@@ -89,15 +113,16 @@ impl From<StartupAuxiliaries> for AuxiliaryDataTypeConsumer {
     fn from(aux: StartupAuxiliaries) -> Self {
         match aux {
             StartupAuxiliaries::F32 {
-                id,
-                initial_value,
-                max_value,
-                min_value,
+                id: _,
+                name: _,
+                initial_value: _,
+                max_value: _,
+                min_value: _,
             } => AuxiliaryDataTypeConsumer::F32,
-            StartupAuxiliaries::F32Vec { id } => AuxiliaryDataTypeConsumer::F32Vec,
-            StartupAuxiliaries::F32Vec2 { id } => AuxiliaryDataTypeConsumer::F32Vec2,
-            StartupAuxiliaries::F32Vec3 { id } => AuxiliaryDataTypeConsumer::F32Vec3,
-            StartupAuxiliaries::F32Vec4 { id } => AuxiliaryDataTypeConsumer::F32Vec4,
+            StartupAuxiliaries::F32Vec { id: _, name: _ } => AuxiliaryDataTypeConsumer::F32Vec,
+            StartupAuxiliaries::F32Vec2 { id: _, name: _ } => AuxiliaryDataTypeConsumer::F32Vec2,
+            StartupAuxiliaries::F32Vec3 { id: _, name: _ } => AuxiliaryDataTypeConsumer::F32Vec3,
+            StartupAuxiliaries::F32Vec4 { id: _, name: _ } => AuxiliaryDataTypeConsumer::F32Vec4,
         }
     }
 }
@@ -106,7 +131,8 @@ impl From<StartupAuxiliaries> for AuxiliaryConfigParams {
     fn from(aux: StartupAuxiliaries) -> Self {
         match aux {
             StartupAuxiliaries::F32 {
-                id,
+                id: _,
+                name: _,
                 initial_value,
                 max_value,
                 min_value,
@@ -115,10 +141,10 @@ impl From<StartupAuxiliaries> for AuxiliaryConfigParams {
                 max_value: max_value.unwrap_or(1.0).clamp(0.0, 1.0),
                 min_value: min_value.unwrap_or(0.0).clamp(0.0, 1.0),
             },
-            StartupAuxiliaries::F32Vec { id } => AuxiliaryConfigParams::F32Vec,
-            StartupAuxiliaries::F32Vec2 { id } => AuxiliaryConfigParams::F32Vec2,
-            StartupAuxiliaries::F32Vec3 { id } => AuxiliaryConfigParams::F32Vec3,
-            StartupAuxiliaries::F32Vec4 { id } => AuxiliaryConfigParams::F32Vec4,
+            StartupAuxiliaries::F32Vec { id: _, name: _ } => AuxiliaryConfigParams::F32Vec,
+            StartupAuxiliaries::F32Vec2 { id: _, name: _ } => AuxiliaryConfigParams::F32Vec2,
+            StartupAuxiliaries::F32Vec3 { id: _, name: _ } => AuxiliaryConfigParams::F32Vec3,
+            StartupAuxiliaries::F32Vec4 { id: _, name: _ } => AuxiliaryConfigParams::F32Vec4,
         }
     }
 }
@@ -137,22 +163,6 @@ pub enum StartupAnimationTargetType {
 }
 
 impl EmblinkenatorConfig {
-    pub fn new(
-        frame_buffer_size: u32,
-        frame_numerator: u32,
-        frame_denominator: u32,
-        leds_per_compute_group: u32,
-        shaders: ShadersConfig,
-    ) -> Self {
-        EmblinkenatorConfig {
-            frame_buffer_size,
-            frame_numerator,
-            frame_denominator,
-            leds_per_compute_group,
-            shaders,
-        }
-    }
-
     pub fn frame_buffer_size(&self) -> u32 {
         self.frame_buffer_size
     }

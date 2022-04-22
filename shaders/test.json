@@ -2,9 +2,9 @@
     "id": "test",
     "shader": "test.wgsl",
     "auxiliaries": [
-        "F32",
-        "F32",
-        "F32",
-        "F32"
+        { "type": "F32", "name": "Steps per second", "description": "e.g. 25.0" },
+        { "type": "F32", "name": "Red Value", "description": "(0.0 - 1.0)" },
+        { "type": "F32", "name": "Green Value", "description": "(0.0 - 1.0)" },
+        { "type": "F32", "name": "Blue Value", "description": "(0.0 - 1.0)" }
     ]
 }

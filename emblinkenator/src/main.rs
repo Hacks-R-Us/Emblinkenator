@@ -8,7 +8,6 @@
 #![deny(clippy::cast_lossless)]
 
 use std::{
-    collections::HashMap,
     fs,
     path::Path,
     sync::Arc,
@@ -256,6 +255,7 @@ async fn main() {
                 .write()
                 .add_auxiliary(
                     auxiliary.clone().into(),
+                    auxiliary.clone().get_name(),
                     auxiliary.clone().into(),
                     auxiliary.clone().into(),
                 )

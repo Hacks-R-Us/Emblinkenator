@@ -321,6 +321,36 @@ impl Display for AuxiliaryDataTypeConsumer {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct AuxiliaryManifest {
+    name: String,
+    description: String,
+    #[serde(rename = "type")]
+    aux_type: AuxiliaryDataTypeConsumer,
+}
+
+impl AuxiliaryManifest {
+    pub fn new(name: String, description: String, aux_type: AuxiliaryDataTypeConsumer) -> Self {
+        Self {
+            name,
+            description,
+            aux_type,
+        }
+    }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn get_description(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn get_aux_type(&self) -> AuxiliaryDataTypeConsumer {
+        self.aux_type.clone()
+    }
+}
+
 pub fn aux_data_is_compatible(
     data: &AuxiliaryDataType,
     consumer: &AuxiliaryDataTypeConsumer,

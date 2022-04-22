@@ -18,10 +18,15 @@ pub enum AddAuxiliaryError {
     AuxiliaryExists(AuxiliaryId),
 }
 
+struct AuxiliaryMetadata {
+    name: String,
+}
+
 pub struct AuxiliaryDataManager {
     animation_auxiliary_sources: RwLock<HashMap<AnimationId, Vec<AuxiliaryId>>>,
     auxiliary_data_buffers: RwLock<HashMap<DeviceId, Receiver<AuxDeviceData>>>,
     auxiliary_data: RwLock<HashMap<AuxiliaryId, AuxiliaryData>>,
+    auxiliary_metadata: RwLock<HashMap<AuxiliaryId, AuxiliaryMetadata>>,
 }
 
 impl AuxiliaryDataManager {
@@ -30,12 +35,14 @@ impl AuxiliaryDataManager {
             animation_auxiliary_sources: RwLock::new(HashMap::new()),
             auxiliary_data_buffers: RwLock::new(HashMap::new()),
             auxiliary_data: RwLock::new(HashMap::new()),
+            auxiliary_metadata: RwLock::new(HashMap::new()),
         }
     }
 
     pub fn add_auxiliary(
         &self,
         aux_id: AuxiliaryId,
+        aux_name: String,
         aux_type: AuxiliaryDataTypeConsumer,
         params: AuxiliaryConfigParams,
     ) -> Result<(), AddAuxiliaryError> {
@@ -64,12 +71,15 @@ impl AuxiliaryDataManager {
         let size = default_value.get_number_of_values();
 
         auxiliaries.insert(
-            aux_id,
+            aux_id.clone(),
             AuxiliaryData {
                 data: default_value,
                 size,
             },
         );
+        self.auxiliary_metadata
+            .write()
+            .insert(aux_id, AuxiliaryMetadata { name: aux_name });
 
         Ok(())
     }

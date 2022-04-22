@@ -3,28 +3,25 @@ use log::{error, info};
 use serde::Deserialize;
 use std::{collections::HashMap, fs};
 
-use crate::auxiliary_data::AuxiliaryDataTypeConsumer;
+use crate::auxiliary_data::AuxiliaryManifest;
 
 use super::ShadersConfig;
 
 #[derive(Clone, Debug)]
 pub struct AnimationManifest {
     pub shader: String,
-    pub auxiliaries: Option<Vec<AuxiliaryDataTypeConsumer>>,
+    pub auxiliaries: Option<Vec<AuxiliaryManifest>>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ShaderManifest {
     pub id: String,
     pub shader: String,
-    pub auxiliaries: Option<Vec<AuxiliaryDataTypeConsumer>>,
+    pub auxiliaries: Option<Vec<AuxiliaryManifest>>,
 }
 
 impl AnimationManifest {
-    fn new(
-        shader: String,
-        auxiliaries: Option<Vec<AuxiliaryDataTypeConsumer>>,
-    ) -> AnimationManifest {
+    fn new(shader: String, auxiliaries: Option<Vec<AuxiliaryManifest>>) -> AnimationManifest {
         AnimationManifest {
             shader,
             auxiliaries,
@@ -47,7 +44,7 @@ impl AnimationRegistry {
         &mut self,
         id: String,
         shader: String,
-        auxiliaries: Option<Vec<AuxiliaryDataTypeConsumer>>,
+        auxiliaries: Option<Vec<AuxiliaryManifest>>,
     ) -> Result<(), AnimationRegistryRegisterError> {
         if self.animations.contains_key(&id) {
             return Err(AnimationRegistryRegisterError::AnimationExistsWithId);
